@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 """
 Created on Wed Mar 16 12:52:24 2016
-
-@author: itanveer
+-------------------------------------------------------------------------------
+    Coded by Md. Iftekhar Tanveer (itanveer@cs.rochester.edu)
+    Rochester Human-Computer Interaction (ROCHCI)
+    University of Rochester
+-------------------------------------------------------------------------------
 """
 import time
 import pandas as pd
