@@ -120,22 +120,25 @@ class AutoMannerPlus(object):
         self.__read_time__(self.timepath+vidid+'/timeline_'+vidid+'.csv')
         self.__read_prosody__()
         self.__selectwalign__()
-        
+
+    # A method for getting the ground truth for ith pattern
+    # provide a video id and a pattern number (i) for that video
+    def getgt(self,vidid,i):
+            return self.gt[vidid][np.where(np.unique(self.patterns[:,0])==i)[0][0]]        
         
     # Extract features from the aligned transcript data
     # Features extracted in this function are as follows (per instance):
     # mean_wrdtime, mean_filltime, mean_pausetime, #w, #fill, #pause,
     # word%_inst, filler%_inst, pause%_inst & the prosody features
     def extractfeaturesfast(self):
-        def getgt(vidid,i):
-            return self.gt[vidid][np.where(np.unique(self.patterns[:,0])==i)[0][0]]
         def id(pat,inst):
             return np.where(self.patterns[:,0]==pat)[0][inst]
-        featurelist = {}
+        m = np.max(self.patterns[:,0])+1
+        featurelist = ddict(list)
         gtlist={}
         # for every pattern i and instance j
         for i,j in self.selected.keys():
-            if getgt(self.vidid,i)==0.:
+            if self.getgt(self.vidid,i)==0.:
                 continue
             # instance start and end time
             inststime = float(self.patterns[id(i,j)][1])
@@ -161,8 +164,8 @@ class AutoMannerPlus(object):
             form_mean = np.mean(formant,axis=0)
             form_std = np.std(formant,axis=0)
             form_range = np.max(formant,axis=0) - np.min(formant,axis=0)
-            # Enlisting the features
-            featurelist[(i,j)]=[\
+            # Summing the features for corresponding patterns (to calculate avg)
+            featurelist[i].append([\
                         # ================== Disfluency features (9) ===================
                         np.mean(wrdTime)if wrdTime else 0.0, # Average time to speak word
                         np.mean(fillTime)if fillTime else 0.0, # Average time to speak filler word
@@ -174,47 +177,53 @@ class AutoMannerPlus(object):
                         np.sum(fillTime)/instLen if fillTime else 0.0, # % of filler per instance
                         np.sum(spTime)/instLen if spTime else 0.0, # % of filler per instance
                         # ==================== Prosody Features (26) =====================
-                        np.mean(loud),                          # Mean loudness
-                        np.min(loud),                           # Minimum loudness
-                        np.max(loud),                           # Maximum loudness
-                        np.max(loud) - np.min(loud),            # loudness range
-                        np.std(loud),                           # loudness standard deviation
-                        np.mean(pitch),                         # Mean pitch
-                        np.min(pitch),                          # Minimum pitch
-                        np.max(pitch),                          # Maximum pitch
-                        np.max(pitch) - np.min(pitch),          # pitch range
-                        np.std(pitch),                          # pitch standard deviation
-                        form_min[0],                            # Minimum first formant
-                        form_min[1],                            # Minimum second formant
-                        form_min[2],                            # Minimum third formant
-                        form_max[0],                            # Maximum first formant
-                        form_max[1],                            # Maximum second formant
-                        form_max[2],                            # Maximum third formant
-                        form_mean[0],                           # Mean first formant
-                        form_mean[1],                           # Mean second formant
-                        form_mean[2],                           # Mean third formant
-                        form_std[0],                            # first formant std
-                        form_std[1],                            # second formant std
-                        form_std[2],                            # third formant std
-                        form_range[0],                          # first formant range
-                        form_range[1],                          # second formant range
-                        form_range[2],                          # third formant range
-                        np.count_nonzero(pitch)/len(pitch)      # percent unvoiced
-                        ]
-            gtlist[(i,j)]=getgt(self.vidid,i)
+                        np.mean(loud),                     # Mean loudness
+                        np.min(loud),                      # Minimum loudness
+                        np.max(loud),                      # Maximum loudness
+                        np.max(loud) - np.min(loud),       # loudness range
+                        np.std(loud),                      # loudness standard deviation
+                        np.mean(pitch),                    # Mean pitch
+                        np.min(pitch),                     # Minimum pitch
+                        np.max(pitch),                     # Maximum pitch
+                        np.max(pitch) - np.min(pitch),     # pitch range
+                        np.std(pitch),                     # pitch standard deviation
+                        form_min[0],                       # Minimum first formant
+                        form_min[1],                       # Minimum second formant
+                        form_min[2],                       # Minimum third formant
+                        form_max[0],                       # Maximum first formant
+                        form_max[1],                       # Maximum second formant
+                        form_max[2],                       # Maximum third formant
+                        form_mean[0],                      # Mean first formant
+                        form_mean[1],                      # Mean second formant
+                        form_mean[2],                      # Mean third formant
+                        form_std[0],                       # first formant std
+                        form_std[1],                       # second formant std
+                        form_std[2],                       # third formant std
+                        form_range[0],                     # first formant range
+                        form_range[1],                     # second formant range
+                        form_range[2],                     # third formant range
+                        np.count_nonzero(pitch)/len(pitch) # percent unvoiced
+                        ])
+        for i in np.unique(self.patterns[:,0]):
+            if not len(featurelist[i])==0:
+                featurelist[i] = np.mean(featurelist[i],axis=0)
+                gtlist[i]=self.getgt(self.vidid,i)
+            else:
+                del featurelist[i]
         return featurelist,gtlist
+    
     def featurename(self):
         return ['Average time to speak word','Average time to speak filler word',\
-'Average pause length','Total number of words','Total number of filler words',\
-'Total number of pauses','% of word per instance','% of filler per instance',\
-'% of filler per instance','Mean loudness','Minimum loudness','Maximum loudness',\
-'loudness range','loudness standard deviation','Mean pitch','Minimum pitch',\
-'Maximum pitch','pitch range','pitch standard deviation','Minimum first formant',\
-'Minimum second formant','Minimum third formant','Maximum first formant',\
-'Maximum second formant','Maximum third formant','Mean first formant',\
-'Mean second formant','Mean third formant','first formant std','second formant std',\
-'third formant std','first formant range','second formant range',\
-'third formant range','percent unvoiced']
+    'Average pause length','Total number of words','Total number of filler words',\
+    'Total number of pauses','% of word per instance','% of filler per instance',\
+    '% of filler per instance','Mean loudness','Minimum loudness','Maximum loudness',\
+    'loudness range','loudness standard deviation','Mean pitch','Minimum pitch',\
+    'Maximum pitch','pitch range','pitch standard deviation','Minimum first formant',\
+    'Minimum second formant','Minimum third formant','Maximum first formant',\
+    'Maximum second formant','Maximum third formant','Mean first formant',\
+    'Mean second formant','Mean third formant','first formant std','second formant std',\
+    'third formant std','first formant range','second formant range',\
+    'third formant range','percent unvoiced']
         
     def __check_fillerness__(self,wrd):
         raise NotImplementedError
@@ -468,11 +477,20 @@ class AutoMannerPlus(object):
             nd =p_nd.copy()        
                 
     # Read a timeline data: patternID, startsec,endsec
+    # It relabels the patterns according to the order
+    # of the highest frequency
     def __read_time__(self,filename):
         with open(filename,'r') as f:
             f.readline()
             self.patterns = np.array([[rows[0]]+rows[2:].strip().split(',')[1:]\
                 for rows in f],dtype=int)
+            patdat_cpy = self.patterns[:,0].copy()
+            # Relabeling the patterns
+            freq = np.bincount(self.patterns[:,0])
+            srti = np.argsort(-freq,kind='mergesort')
+            for i,item in enumerate(srti):
+                patdat_cpy[self.patterns[:,0]==item]=i
+            self.patterns[:,0]=patdat_cpy
 
 class visualize(object):
     """A class for visualizing the features with respect to ground truth.
@@ -508,7 +526,7 @@ class visualize(object):
                 plt.ion()
             for idx, item in enumerate(np.unique(gt)):
                 plt.scatter(np.array(x)[gt==item],np.array(y)[gt==item],\
-                    c=leg[idx], label=idx+1)
+                    c=leg[idx], label=item)
                 plt.xlabel(self.data['featurename'][featlist[0]])
                 plt.ylabel(self.data['featurename'][featlist[1]])
             plt.legend()
@@ -569,8 +587,9 @@ def firstapproach():
     w2v = Word2Vec()
     w2v.load()
     amp = AutoMannerPlus(gtfile,alignpath,timepath,prosodypath)
-    vid = ['34.1','35.2','36.1','37.2','38.1','39.2','40.1','41.2','42.1','44.1','45.2',
-            '46.1','47.2','48.1','49.2','50.1','51.2','52.1','53.2','54.1','55.2','56.1','57.2',
+    vid = ['34.1','35.2','36.1','37.2','38.1','39.2','40.1','41.2','42.1',
+            '44.1','45.2','46.1','47.2','48.1','49.2','50.1','51.2','52.1',
+            '53.2','54.1','55.2','56.1','57.2',
             '58.1','59.2','60.1','61.2','62.1']
     score_w2v=[]
     score_pos=[]
@@ -586,11 +605,14 @@ def firstapproach():
         # Add linked words for saving
         lnkdat_words[avid].extend([item for item in amp.lnkdata[:]])
         lnkdat_pos[avid].extend([item for item in amp.lnkdata_pos[:]])
-    x_w2v = np.array([subitem for item in score_w2v for subitem in item],dtype='a5,i2,f8,f2')
-    x_pos = np.array([subitem for item in score_pos for subitem in item],dtype='a5,i2,f8,f2')
-    cp.dump({'simscore_w2v':x_w2v,'simscore_pos':x_pos,'words':lnkdat_words,'pos':lnkdat_pos,\
-        'w2vCorr':np.corrcoef(x_w2v['f2'],x_w2v['f3']),'posCorr':np.corrcoef(\
-        x_pos['f2'],x_pos['f3'])},open('output.pkl', 'wb'))
+    x_w2v = np.array([subitem for item in score_w2v for subitem in item],\
+            dtype='a5,i2,f8,f2')
+    x_pos = np.array([subitem for item in score_pos for subitem in item],\
+            dtype='a5,i2,f8,f2')
+    cp.dump({'simscore_w2v':x_w2v,'simscore_pos':x_pos,'words':lnkdat_words,\
+        'pos':lnkdat_pos,'w2vCorr':np.corrcoef(x_w2v['f2'],x_w2v['f3']),\
+        'posCorr':np.corrcoef(x_pos['f2'],x_pos['f3'])},\
+        open('output.pkl', 'wb'))
     print 'w2v',np.corrcoef(x_w2v['f2'],x_w2v['f3'])
     print 'pos',np.corrcoef(x_pos['f2'],x_pos['f3'])    
 
@@ -603,9 +625,10 @@ def secondapproach():
     prosodypath = '/Users/itanveer/Data/ROCSpeak_BL/features/prosody/'
     
     amp = AutoMannerPlus(gtfile,alignpath,timepath,prosodypath)
-    vid = ['34.1','35.2','36.1','37.2','38.1','39.2','40.1','41.2','42.1','44.1','45.2',
-            '46.1','47.2','48.1','49.2','50.1','51.2','52.1','53.2','54.1','55.2','56.1','57.2',
-            '58.1','59.2','60.1','61.2','62.1']
+    vid = ['34.1','35.2','36.1','37.2','38.1','39.2','40.1','41.2','42.1',
+            '44.1','45.2','46.1','47.2','48.1','49.2','50.1','51.2','52.1',
+            '53.2','54.1','55.2','56.1','57.2','58.1','59.2','60.1','61.2',
+            '62.1']
     X_data = ddict(list)
     Y_data = ddict(list)
     vidid=[]
@@ -613,9 +636,9 @@ def secondapproach():
         print 'processing ...',avid
         amp.readfast(avid)
         features,gt_ = amp.extractfeaturesfast()
-        for i,j in features.keys():
-            X_data[avid].append(features[i,j])
-            Y_data[avid].append(gt_[i,j])
+        for i in features.keys():
+            X_data[avid].append(features[i])
+            Y_data[avid].append(gt_[i])
     print 'Dump all data to features_gt.pkl file'
     cp.dump({'X':X_data,'Y':Y_data,'featurename':amp.featurename()},open('features_gt.pkl','wb'))
 
