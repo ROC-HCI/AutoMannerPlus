@@ -493,7 +493,8 @@ class AutoMannerPlus(object):
             self.patterns[:,0]=patdat_cpy
 
 class visualize(object):
-    """A class for visualizing the features with respect to ground truth.
+    """
+    A class for visualizing the features with respect to ground truth.
     """
     def __init__(self, pklfilename = 'features_gt.pkl'):
         self.data = cp.load(open(pklfilename,'rb'))
@@ -504,6 +505,7 @@ class visualize(object):
     def printvideonames(self):
         for vidname in np.sort(self.data['X'].keys()):
             print vidname
+    
     # provide indices of two features and a videoid to plot wrt gt
     def draw2features(self,featlist,vidid='all',interactive=True):
         if not len(featlist)==2:
@@ -591,8 +593,10 @@ def firstapproach():
             '44.1','45.2','46.1','47.2','48.1','49.2','50.1','51.2','52.1',
             '53.2','54.1','55.2','56.1','57.2',
             '58.1','59.2','60.1','61.2','62.1']
-    score_w2v=[]
-    score_pos=[]
+    scorels_w2v=[]
+    scorels_pos=[]
+    corr_w2v=[]
+    corr_pos=[]
     lnkdat_words=ddict(list)
     lnkdat_pos=ddict(list)
     for avid in vid:
@@ -600,21 +604,36 @@ def firstapproach():
         # Read the necessary files
         amp.readEverything(transpath,avid,w2v)
         # Calculate similarity
-        score_w2v.append(amp.calcContextSim('w2v'))
-        score_pos.append(amp.calcContextSim('pos'))
+        score_w2v = amp.calcContextSim('w2v')
+        score_pos = amp.calcContextSim('pos')
+        scorels_w2v.append(score_w2v)
+        scorels_pos.append(score_pos)
         # Add linked words for saving
         lnkdat_words[avid].extend([item for item in amp.lnkdata[:]])
         lnkdat_pos[avid].extend([item for item in amp.lnkdata_pos[:]])
-    x_w2v = np.array([subitem for item in score_w2v for subitem in item],\
-            dtype='a5,i2,f8,f2')
-    x_pos = np.array([subitem for item in score_pos for subitem in item],\
-            dtype='a5,i2,f8,f2')
-    cp.dump({'simscore_w2v':x_w2v,'simscore_pos':x_pos,'words':lnkdat_words,\
-        'pos':lnkdat_pos,'w2vCorr':np.corrcoef(x_w2v['f2'],x_w2v['f3']),\
-        'posCorr':np.corrcoef(x_pos['f2'],x_pos['f3'])},\
+        # Calculate the correlation coefficient for this videos
+        corr_w2v_temp = np.corrcoef([arow[2] for arow in score_w2v],\
+            [arow[3] for arow in score_w2v])[0,1]
+        corr_pos_temp = np.corrcoef([arow[2] for arow in score_pos],\
+            [arow[3] for arow in score_pos])[0,1]
+        print 'w2v corr:',corr_w2v_temp, 'pos corr:',corr_pos_temp
+        # Append the data in list for averaging        
+        corr_w2v.append(corr_w2v_temp)
+        corr_pos.append(corr_pos_temp)
+    # Calculate the average
+    mean_w2v_corr = np.nanmean(corr_w2v)
+    mean_pos_corr = np.nanmean(corr_pos)
+    print 'w2v',mean_w2v_corr
+    print 'pos',mean_pos_corr
+    # Preparing and saving all data    
+    simscore_w2v = np.array([item for item in score_w2v],\
+            dtype=[('vidid','a5'),('pattern','i2'),('score','f8'),('gt','f2')])
+    simscore_pos = np.array([item for item in score_pos],\
+            dtype=[('vidid','a5'),('pattern','i2'),('score','f8'),('gt','f2')])
+    cp.dump({'simscore_w2v':simscore_w2v,'simscore_pos':simscore_pos,\
+        'words':lnkdat_words,'pos':lnkdat_pos,\
+        'w2vCorr':mean_w2v_corr,'posCorr':mean_pos_corr},\
         open('output.pkl', 'wb'))
-    print 'w2v',np.corrcoef(x_w2v['f2'],x_w2v['f3'])
-    print 'pos',np.corrcoef(x_pos['f2'],x_pos['f3'])    
 
 # In this approach, we just extract a number of features and then try to cluster
 # them using PCA and LDA. We can also train a classifier to predict the ground truth.
@@ -643,4 +662,4 @@ def secondapproach():
     cp.dump({'X':X_data,'Y':Y_data,'featurename':amp.featurename()},open('features_gt.pkl','wb'))
 
 if __name__=='__main__':
-    secondapproach()
+    firstapproach()
