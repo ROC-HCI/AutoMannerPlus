@@ -15,6 +15,7 @@ import cPickle as cp
 from collections import defaultdict as ddict
 from scipy.signal import resample
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 from sklearn.decomposition import PCA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 
@@ -492,6 +493,44 @@ class AutoMannerPlus(object):
                 patdat_cpy[self.patterns[:,0]==item]=i
             self.patterns[:,0]=patdat_cpy
 
+class AutoMannerPlus_mturk(AutoMannerPlus):
+    '''
+    AMP_MT is a child of AutoMannerPlus. It assumes that the ground truth
+    is being read from mechanical turk annotation file.
+    '''
+    def __readGT__(self,
+        filename,
+        fieldname='This body movement pattern conveys a meaning.'
+        ):
+    # Most part of mechanical turk annotation is just same as participant
+    # annotation, except the same video is annotated by multiple (3) turkers
+        alldata = []
+        data_row = ddict(list)        
+        with open(filename,'r') as f:
+            # Turker file doesn't have newline character
+            gtfiledat = f.read().split('\r')
+            # reading the header and calculating column id (pid) for meaningfulness rating
+            header = gtfiledat[0].split(',')
+            pid = [idx for idx,item in enumerate(header) if item==fieldname]
+            # Reading actual data
+            for arow in gtfiledat[1:]:
+                # Skip the random part of the data
+                if 'random' in arow.lower():
+                    continue
+                rowdat = [item if i<3 else  float(item) if item \
+                    else 0. for i,item in enumerate(arow.strip().split(','))]
+                alldata.append(rowdat)
+            # Accumulating MTurk answers
+            for arow in alldata:
+                data_row[arow[2]].append(arow[3:])
+            # Averaging the mechanical turk answers
+            for item in data_row.keys():
+                data_row[item] = map(int,\
+                    np.round(np.mean(data_row[item],axis=0)).tolist())
+            # Make ground truth dict
+            self.gt = {item:[data_row[item][idx-3] for idx in pid]\
+             for item in data_row.keys()}
+
 class visualize(object):
     """
     A class for visualizing the features with respect to ground truth.
@@ -503,8 +542,8 @@ class visualize(object):
         for idx,feat in enumerate(self.data['featurename']):
             print idx,'\t',feat
     def printvideonames(self):
-        for vidname in np.sort(self.data['X'].keys()):
-            print vidname
+        for i, vidname in enumerate(np.sort(self.data['X'].keys())):
+            print i,':',vidname
     
     # provide indices of two features and a videoid to plot wrt gt
     def draw2features(self,featlist,vidid='all',interactive=True):
@@ -523,12 +562,13 @@ class visualize(object):
                 gt = [item for vidid_ in self.data['X'].keys() for item in \
                     self.data['Y'][vidid_] ]
             # Now plot the features
-            leg = ['red','blue','green','yellow','cyan','magenta','black']
+            unq_gt = np.unique(gt)
+            colors = cm.cool(np.linspace(0, 1, len(unq_gt)))
             if interactive:
                 plt.ion()
-            for idx, item in enumerate(np.unique(gt)):
+            for idx, item in enumerate(unq_gt):
                 plt.scatter(np.array(x)[gt==item],np.array(y)[gt==item],\
-                    c=leg[idx], label=item)
+                    color=colors[idx], label=item)
                 plt.xlabel(self.data['featurename'][featlist[0]])
                 plt.ylabel(self.data['featurename'][featlist[1]])
             plt.legend()
@@ -543,12 +583,13 @@ class visualize(object):
         pca = PCA(n_components=2)
         x_project = pca.fit_transform(x)
         # Now plot the features
-        leg = ['red','blue','green','yellow','cyan','magenta','black']
         if interactive:
             plt.ion()
-        for idx, item in enumerate(np.unique(y)):
+        unq_y = np.unique(y)
+        colors = cm.cool(np.linspace(0, 1, len(unq_y)))
+        for idx, item in enumerate(unq_y):
             plt.scatter(x_project[y==item,0],x_project[y==item,1],\
-                c=leg[idx], label=idx+1)
+                color=colors[idx], label=item)
         plt.xlabel('First Principal Component')
         plt.ylabel('Second Principal Component')
         plt.legend()
@@ -561,18 +602,21 @@ class visualize(object):
         y = np.array([item for vidid_ in self.data['X'].keys() \
             for item in self.data['Y'][vidid_] ])
         lda = LDA()
-        x_project=lda.fit_transform(x,y)
+        x_project=lda.fit_transform(x,y.tolist())
         # Now plot the features
-        leg = ['red','blue','green','yellow','cyan','magenta','black']
         if interactive:
             plt.ion()
-        for idx, item in enumerate(np.unique(y)):
+        unq_y = np.unique(y)
+        colors = cm.cool(np.linspace(0, 1, len(unq_y)))
+        for idx, item in enumerate(unq_y):
             plt.scatter(x_project[y==item,0],x_project[y==item,1],\
-                c=leg[idx], label=idx+1)
+                color=colors[idx], label=item)
         plt.xlabel('First LDA Component')
         plt.ylabel('Second LDA Component')
         plt.legend()
         plt.show()        
+
+###################################### Testing Module ###########################
 
 # In this first approach, we assumed that if the various time-instances where
 # the same pattern occurred shows similiar words, then it means a good pattern
@@ -638,6 +682,7 @@ def firstapproach():
 # In this approach, we just extract a number of features and then try to cluster
 # them using PCA and LDA. We can also train a classifier to predict the ground truth.
 def secondapproach():
+    # Participants' ground truth
     alignpath = '/Users/itanveer/Data/ROCSpeak_BL/features/alignments/'
     timepath = '/Users/itanveer/Data/ROCSpeak_BL/Original_Data/Results/'
     gtfile = '/Users/itanveer/Data/ROCSpeak_BL/Ground-Truth/participants_ratings.csv'
@@ -659,7 +704,34 @@ def secondapproach():
             X_data[avid].append(features[i])
             Y_data[avid].append(gt_[i])
     print 'Dump all data to features_gt.pkl file'
-    cp.dump({'X':X_data,'Y':Y_data,'featurename':amp.featurename()},open('features_gt.pkl','wb'))
+    cp.dump({'X':X_data,'Y':Y_data,'featurename':amp.featurename()},\
+        open('features_gt.pkl','wb'))
+
+# This approach scales the data by utilizing the mechanical turk annotations
+def thirdapproach():
+    # Participants' ground truth
+    alignpath = '/Users/itanveer/Data/ROCSpeak_BL/features/alignments/'
+    timepath = '/Users/itanveer/Data/ROCSpeak_BL/Original_Data/Results_for_MTurk/'
+    gtfile = '/Users/itanveer/Data/ROCSpeak_BL/Ground-Truth/turkers_ratings.csv'
+    prosodypath = '/Users/itanveer/Data/ROCSpeak_BL/features/prosody/'
+    amp = AutoMannerPlus_mturk(gtfile,alignpath,timepath,prosodypath)
+    
+    # for all the files, extract features
+    X_data = ddict(list)
+    Y_data = ddict(list)
+    vidid=[]
+    # File list can be found in gt dict
+    for avid in amp.gt.keys():
+        print 'processing ...',avid
+        amp.readfast(avid)
+        features,gt_ = amp.extractfeaturesfast()
+        for i in features.keys():
+            X_data[avid].append(features[i])
+            Y_data[avid].append(gt_[i])
+    print 'Dump all data to features_MT_gt.pkl file'
+    cp.dump({'X':X_data,'Y':Y_data,'featurename':amp.featurename()},\
+        open('features_MT_gt.pkl','wb'))
+
 
 if __name__=='__main__':
-    firstapproach()
+    thirdapproach()
