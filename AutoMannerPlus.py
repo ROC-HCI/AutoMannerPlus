@@ -613,53 +613,89 @@ class classify(object):
             for dat in data['X'][vid]]
         self.y = [item for vid in data['Y'].keys() for item in data['Y'][vid]]
 
-    # Classification of the saved data
-    def apply(self,
+    # Test avg. correlation for multiple regressions
+    def test_avg_corr(self,
         method='lasso', # Method of classification
-        tot_iter = 10  # Total number of repeated experiment
+        tot_iter = 30  # Total number of repeated experiment
         ):
-        # sparcity penalty parameter values
-        alphlist = [0.001,0.005,0.01,0.05,0.075,0.1,0.15,0.2,0.3,0.4,0.5,0.6,\
-            0.7,0.8,0.9,1.0,1.5,2,3,4,5,10,50,100,500,1000,5000,10000,50000]
-        # Train and test the classifier many times for calculating the accuracy
-        correl = []
-        for i in xrange(tot_iter):
-            print 'iter:',i
-            # One third of the data is reserved for testing
-            x_train,x_test,y_train,y_test = \
-                sk.cross_validation.train_test_split(\
-                self.x,self.y,train_size=0.3,random_state=\
-                int(time.time()*1000)%4294967295)
-            # One third of the training data is used as validation
-            x_tr,x_val,y_tr,y_val = sk.cross_validation.train_test_split(\
-                x_train,y_train,train_size=0.3,random_state=\
-                int(time.time()*1000)%4294967295)
-            # Choose a good alpha (Tune the best penalty with validation set)
-            scores=[]
-            for analpha in alphlist:
-                model = linear_model.Lasso(alpha=analpha, fit_intercept=True, \
+        if method=='lasso':
+            # sparcity penalty parameter values
+            alphlist = [0.001,0.005,0.01,0.05,0.075,0.1,0.15,0.2,0.3,0.4,0.5,0.6,\
+                0.7,0.8,0.9,1.0,1.5,2,3,4,5,10,50,100,500,1000,5000,10000,50000]
+            # Train and test the classifier many times for calculating the accuracy
+            correl = []
+            coefs = []
+            for i in xrange(tot_iter):
+                print 'iter:',i,
+                # One third of the data is reserved for testing
+                x_train,x_test,y_train,y_test = \
+                    sk.cross_validation.train_test_split(\
+                    self.x,self.y,train_size=0.3,random_state=\
+                    int(time.time()*1000)%4294967295)
+                # One third of the training data is used as validation
+                x_tr,x_val,y_tr,y_val = sk.cross_validation.train_test_split(\
+                    x_train,y_train,train_size=0.3,random_state=\
+                    int(time.time()*1000)%4294967295)
+                # Choose a good alpha (Tune to the best penalty
+                # using validation set)
+                scores=[]
+                for analpha in alphlist:
+                    model = linear_model.Lasso(alpha=analpha, fit_intercept=True, \
+                        normalize=False, precompute=False, copy_X=True, \
+                        max_iter=1000000, tol=0.0001, warm_start=False, \
+                        positive=False,selection='random')
+                    scores.append(model.fit(x_tr,y_tr).score(x_val,y_val))
+                # Obtaining the best model as per validation dataset
+                best_alpha = alphlist[np.argmax(scores)]
+                print 'best alpha:',best_alpha,
+                best_model = linear_model.Lasso(alpha=best_alpha,\
+                    fit_intercept=True, \
                     normalize=False, precompute=False, copy_X=True, \
                     max_iter=1000000, tol=0.0001, warm_start=False, \
                     positive=False,selection='random')
-                scores.append(model.fit(x_tr,y_tr).score(x_val,y_val))
-            # Obtaining the best model as per validation dataset
-            best_alpha = alphlist[np.argmax(scores)]
-            print 'best alpha:',best_alpha,
-            best_model = linear_model.Lasso(alpha=best_alpha,\
-                fit_intercept=True, \
-                normalize=False, precompute=False, copy_X=True, \
-                max_iter=1000000, tol=0.0001, warm_start=False, \
-                positive=False,selection='random')
-            best_model.fit(x_tr,y_tr)
-            # Prediction results
-            y_pred = best_model.predict(x_test)
-            # Calculate correlation with original
-            corr_val = np.corrcoef(y_test,y_pred)[0,1]
-            correl.append(corr_val)
-            print 'Correlation:',corr_val
-        print 'Average correlation:', np.mean(correl)
+                # Training the best model
+                best_model.fit(x_tr,y_tr)
+                coefs.append(self.__coef_calc__(best_model.coef_))
+                # Prediction results
+                y_pred = best_model.predict(x_test)
+                # Calculate correlation with original
+                corr_val = np.corrcoef(y_test,y_pred)[0,1]
+                correl.append(corr_val)
+                print 'Correlation:',corr_val
+            import pdb;pdb.set_trace()
+            print 'Average correlation:', np.mean(correl)
+    
+    # Calculates the relative weights of the coefficients
+    # 1. Total weights for disfluency, prosody and body features
+    # 2. Number of non-zeros for ... 
+    # 3. Weights per unit non-zero feature
+    # 4. Percent of feature categories
+    def __coef_calc__(self,coef):
+        disf = coef[:9]   # Disfluency features
+        pros = coef[9:35] # Prosody features
+        body = coef[35:]  # Body features
+        # Total weights
+        sum_disf = np.sum(disf)
+        sum_pros = np.sum(pros)
+        sum_body = np.sum(body)
+        # Number of non-zeros
+        nnz_disf = np.count_nonzero(disf)
+        nnz_pros = np.count_nonzero(pros)
+        nnz_body = np.count_nonzero(body)
+        # ratios
+        rat_disf = sum_disf/float(nnz_disf)
+        rat_pros = sum_pros/float(nnz_pros)
+        rat_body = sum_body/float(nnz_body)
+        total_rat = rat_disf + rat_pros + rat_body
+        # percents
+        perc_disf = rat_disf/total_rat * 100.
+        perc_pros = rat_pros/total_rat * 100.
+        perc_body = rat_body/total_rat * 100.
 
-
+        return sum_disf,sum_pros,sum_body,\
+        nnz_disf,nnz_pros,nnz_body,rat_disf,\
+        rat_pros,rat_body,perc_disf,perc_pros,\
+        perc_body
 
 class visualize(object):
     """
@@ -866,8 +902,9 @@ def thirdapproach():
 
 # Test of the classfiers
 def classification():
-    cls = classify('features_MT_gt.pkl')
-    cls.apply()
+    cls = classify('features_MT_gt.pkl',)
+    cls.test_avg_corr(tot_iter=25)
 
 if __name__=='__main__':
+    #thirdapproach()
     classification()
