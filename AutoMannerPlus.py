@@ -16,13 +16,14 @@ from collections import defaultdict as ddict
 from scipy.signal import resample
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+import sklearn as sk
 from sklearn.decomposition import PCA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 
 class AutoMannerPlus(object):
     ''' 
     A class extracting features for classifying gestures as mannerism or meaningful.
-    Class global variables:
+    Class variables:
     =======================
     walign             : Numpy array of all the aligned words and their startime, endtime.
                          Its dtype=[('word', 'S15'), ('stime', '<f2'), ('etime', '<f2')].
@@ -31,7 +32,7 @@ class AutoMannerPlus(object):
                          may contain additional 'sp' word which indicates silence or no voice.
     trans              : A list of all the transcription words. Note that the transcription words
                          are tokenized and lowercase. So "I've" is broken into "i" and "'ve".
-    pos                : A List of all the POS tags for the corresponding transcription words.                      
+    pos                : A List of all the POS tags for the corresponding transcription words.
     align2trmap        : a dictionary from alignment word index (key) to transcription word (value)
                          index. If an alignment word is not found in trans list (e.g. sp) then the
                          value is set to -1.
@@ -44,17 +45,18 @@ class AutoMannerPlus(object):
     lnkdata_pos        : Similar to lnkdata but contains POS
     w2vdata            : Similar to lnkdata but contains w2v info
     alignpath, 
-    timepath, 
+    timepath,      
     trasnpath          : various pathnames
-    selected           : A dictionary from (pat,inst) tuple to indices of walign that falls within that
-                         inst's time period.
+    selected           : A dictionary from (pat,inst) tuple to indices of walign
+                         that falls within that inst's time period.
+    sorted2unsorted    : A dictionary from sorted to unsorted pattern ID's
 '''
     # Provide the filenames: pattern-timeline file, aligned transcript file
     def __init__(self,
         gtfilename, # ground truth filename
         alignpath,  # path where alignfile resides
-        timepath,   # path where timeline file resides (provide the folder containing the video\
-                    # name folder)
+        timepath,   # path where timeline file resides (provide the folder
+                    # containing the video name folder)
         prosodypath # path where the prosody files are located
         ):
         self.__readGT__(gtfilename)
@@ -86,9 +88,10 @@ class AutoMannerPlus(object):
     # A convenience function to view the ground truth data
     def viewgt(self):
         patlist = np.unique(self.patterns[:,0])
-        print 'patternID','\t','GT_Score'
+        print 'patternID','\t','old_patternID','\t','GT_Score'
         for idx,apat in enumerate(patlist):
-            print apat, '\t','\t',self.gt[self.vidid][idx]
+            print apat,'\t','\t',self.sorted2unsorted[apat],\
+                '\t','\t',self.gt[self.vidid][idx]
 
     # Read files in full detail. w2v is a preloaded Word2Vector object 
     def readEverything(self,transpath,vidid,w2v):
@@ -103,16 +106,18 @@ class AutoMannerPlus(object):
         self.__read_time__(self.timepath+vidid+'/timeline_'+vidid+'.csv')
         self.__read_trans__(self.transpath+vidid+'.txt')
         self.__read_prosody__()
+        self.__read__body_movements__()        
         # Build the links with transcript data. This part is time consuming
         self.__buildalign2trmap__()
         self.__lnwordpatt__()
         self.__selectwalign__()
         
-    # Faster read without the transcription data. Some features don't need transcripts.
-    # However, transcript data requires a time-consuming alignment process which could be avoided
-    # in a faster group of feature extraction.
-    # Please note, this function doesn't prepare the variables align2trmap, lnkdata, lnkdata_pos and
-    # w2vdata. So, after calling this function, those variables are either unavailable or non-updated
+    # Faster read without the transcription data. Some features don't need 
+    # transcripts. However, transcript data requires a time-consuming 
+    # alignment process which could be avoided in a faster group of feature
+    # extraction. Please note, this function doesn't prepare the variables
+    # align2trmap, lnkdata, lnkdata_pos and w2vdata. So, after calling this
+    # function, those variables are either unavailable or non-updated
     # However, this creates a new variable: selected
     def readfast(self,vidid):
         self.vidid = vidid
@@ -120,6 +125,7 @@ class AutoMannerPlus(object):
         self.__read_align__(self.alignpath+vidid+'.txt')
         self.__read_time__(self.timepath+vidid+'/timeline_'+vidid+'.csv')
         self.__read_prosody__()
+        self.__read__body_movements__()
         self.__selectwalign__()
 
     # A method for getting the ground truth for ith pattern
@@ -134,7 +140,6 @@ class AutoMannerPlus(object):
     def extractfeaturesfast(self):
         def id(pat,inst):
             return np.where(self.patterns[:,0]==pat)[0][inst]
-        m = np.max(self.patterns[:,0])+1
         featurelist = ddict(list)
         gtlist={}
         # for every pattern i and instance j
@@ -166,10 +171,10 @@ class AutoMannerPlus(object):
             form_std = np.std(formant,axis=0)
             form_range = np.max(formant,axis=0) - np.min(formant,axis=0)
             # Summing the features for corresponding patterns (to calculate avg)
-            featurelist[i].append([\
+            feats = [\
                         # ================== Disfluency features (9) ===================
-                        np.mean(wrdTime)if wrdTime else 0.0, # Average time to speak word
-                        np.mean(fillTime)if fillTime else 0.0, # Average time to speak filler word
+                        np.mean(wrdTime)if wrdTime else 0.0, # Average time to speak words
+                        np.mean(fillTime)if fillTime else 0.0, # Average time to speak filler words
                         np.mean(spTime) if spTime else 0.0,    # Average pause length
                         len(wrdTime) if wrdTime else 0.0,      # Total number of words
                         len(fillTime) if fillTime else 0.0,    # Total number of filler words
@@ -204,7 +209,11 @@ class AutoMannerPlus(object):
                         form_range[1],                     # second formant range
                         form_range[2],                     # third formant range
                         np.count_nonzero(pitch)/len(pitch) # percent unvoiced
-                        ])
+                        ]
+            import pdb;pdb.set_trace()
+            feats.extend(self.__calcbodyfeat__(i))         # Body movement features
+            featurelist[i].append(feats)
+        # ==================== feature averaging ======================
         for i in np.unique(self.patterns[:,0]):
             if not len(featurelist[i])==0:
                 featurelist[i] = np.mean(featurelist[i],axis=0)
@@ -213,11 +222,42 @@ class AutoMannerPlus(object):
                 del featurelist[i]
         return featurelist,gtlist
     
+    # Calculate the body coordinates
+    def __calcbodyfeat__(self,patid):
+        # jid = joint id
+        def jid(j):
+            return np.arange(3*j,3*j+3)
+        def length(v):
+            return np.sqrt(v[:,0]**2.+v[:,1]**2.+v[:,2]**2.)
+        features = []
+        for j in range(1,20):
+            # represent joints wrt the reference joint (hip)
+            pos = self.bodymoves[patid][:,jid(j)]-\
+            	self.bodymoves[patid][:,jid(0)]
+            # normalize length to reduce person dependency
+            pos = pos/np.mean(length(pos))
+            # calculate the velocity and accelerations
+            vel = np.diff(pos,axis=0)
+            acc = np.diff(pos,n=2,axis=0)
+            # Calculate features
+            features.append(np.mean(length(vel)))     # Mean joint velocity mag.
+            features.append(np.mean(length(acc)))     # Mean joint acceleration mag
+            features.append(np.std(length(pos)))      # STD joint position mag
+            features.append(np.std(length(vel)))      # STD joint velocity mag
+            features.append(np.std(length(acc)))      # STD joint acceleration mag        
+            features.append(np.min(length(pos)))      # min joint position mag
+            features.append(np.min(length(vel)))      # min joint velocity mag
+            features.append(np.min(length(acc)))      # min joint acceleration mag
+            features.append(np.max(length(pos)))      # max joint position mag
+            features.append(np.max(length(vel)))      # max joint velocity mag
+            features.append(np.max(length(acc)))      # max joint acceleration mag
+        return features
+    
     def featurename(self):
         return ['Average time to speak word','Average time to speak filler word',\
     'Average pause length','Total number of words','Total number of filler words',\
     'Total number of pauses','% of word per instance','% of filler per instance',\
-    '% of filler per instance','Mean loudness','Minimum loudness','Maximum loudness',\
+    '% of pause per instance','Mean loudness','Minimum loudness','Maximum loudness',\
     'loudness range','loudness standard deviation','Mean pitch','Minimum pitch',\
     'Maximum pitch','pitch range','pitch standard deviation','Minimum first formant',\
     'Minimum second formant','Minimum third formant','Maximum first formant',\
@@ -229,8 +269,8 @@ class AutoMannerPlus(object):
     def __check_fillerness__(self,wrd):
         raise NotImplementedError
     
-    # This is the full version of feature extraction. call it only if you used the readEverything
-    # function earlier
+    # This is the full version of feature extraction. call it only if you 
+    # used the readEverything function earlier
     def extractAllFeatures(self):
         raise NotImplementedError('Not implemented yet')
         
@@ -254,12 +294,14 @@ class AutoMannerPlus(object):
                 # for every instance in the pattern
                 for i in range(len(self.w2vdata[idx])):
                     for j in range(i):
-                        # In order to calculate similarity of a set of n 300 dimensional vectors 
-                        # another set of k 300 dimensional vectors, we apply matrix product
+                        # In order to calculate similarity of a set of n 300 
+                        # dimensional vectors another set of k 300 dimensional 
+                        # vectors, we apply matrix product
                         instSim.extend(self.w2vdata[idx][i].dot \
                             (self.w2vdata[idx][j].T).flatten().tolist())
                 # participant's annotation
-                gtvalue = self.gt[self.vidid][np.where(patlist == self.lnkdata[idx][0][0])[0][0]]
+                gtvalue = self.gt[self.vidid][np.where(patlist == \
+                    self.lnkdata[idx][0][0])[0][0]]
                 if not instSim:
                     continue
                 simdat = (self.vidid,self.lnkdata[idx][0][0],np.mean(instSim),gtvalue)
@@ -274,11 +316,12 @@ class AutoMannerPlus(object):
                 for i in range(len(apat)):
                     for j in range(i):
                         # calculate similarity by pos intersection count / pos union count
-                        instSim.append(float(len(np.intersect1d(self.lnkdata_pos[idx][i][1:],\
-                        self.lnkdata_pos[idx][j][1:])))/ float(len(np.union1d(\
+                        instSim.append(float(len(np.intersect1d(self.lnkdata_pos[idx]\
+                        [i][1:],self.lnkdata_pos[idx][j][1:])))/ float(len(np.union1d(\
                         self.lnkdata_pos[idx][i][1:],self.lnkdata_pos[idx][j][1:]))))
                 # participant's annotation
-                gtvalue = self.gt[self.vidid][np.where(patlist == self.lnkdata[idx][0][0])[0][0]]
+                gtvalue = self.gt[self.vidid][np.where(patlist == \
+                    self.lnkdata[idx][0][0])[0][0]]
                 if not instSim:
                     continue
                 simdat = (self.vidid,self.lnkdata[idx][0][0],np.mean(instSim),gtvalue)
@@ -398,7 +441,6 @@ class AutoMannerPlus(object):
                 # reading the total file length
                 if idx == 5:
                     m = int(aline.strip().split('=')[1].strip())
-                    n = 3
                     self.formant = np.zeros((m,3),dtype='float')
                 # acting based on state (saving the formants)
                 if nextline1:
@@ -444,10 +486,10 @@ class AutoMannerPlus(object):
         self.trans = nltk.word_tokenize(txt.lower())
         self.pos = [item[1] for item in nltk.pos_tag(self.trans)]
 
-    # Create a map frm the alignment word to the transcript word (ignore sp) using dynamic
-    # programming. This is important because the aligned transcript file has missing words.
-    # Also, the sentence boundary and other POS information is relative to the original
-    # transcript.   
+    # Create a map frm the alignment word to the transcript word (ignore sp)
+    # using dynamic programming. This is important because the aligned 
+    # transcript file has missing words. Also, the sentence boundary and 
+    # other POS information is relative to the original transcript.   
     def __buildalign2trmap__(self):
         # Forced alignment wordlist
         alist = [item for item in self.walign['word'].tolist()]
@@ -491,7 +533,21 @@ class AutoMannerPlus(object):
             srti = np.argsort(-freq,kind='mergesort')
             for i,item in enumerate(srti):
                 patdat_cpy[self.patterns[:,0]==item]=i
+            # filling the sorted2unsorted variable
+            self.sorted2unsorted = {item1:item2 for item1,item2\
+                in zip(patdat_cpy,self.patterns[:,0])}
+            # Relabeling the original
             self.patterns[:,0]=patdat_cpy
+            
+    # Method for calculating the body movement features
+    def __read__body_movements__(self):
+        self.bodymoves={}
+        for apat in np.unique(self.patterns[:,0]):
+            filepath = self.timepath+self.vidid+'/'+'tdp_'+\
+                str(self.sorted2unsorted[apat])+'_'+self.vidid+'.csv'
+            with open(filepath,'r') as f:
+                self.bodymoves[apat] = np.array([[float(j) for j in \
+                    i.strip().split(',')] for i in f])
 
 class AutoMannerPlus_mturk(AutoMannerPlus):
     '''
@@ -509,7 +565,8 @@ class AutoMannerPlus_mturk(AutoMannerPlus):
         with open(filename,'r') as f:
             # Turker file doesn't have newline character
             gtfiledat = f.read().split('\r')
-            # reading the header and calculating column id (pid) for meaningfulness rating
+            # reading the header and calculating column id (pid) for
+            # meaningfulness rating
             header = gtfiledat[0].split(',')
             pid = [idx for idx,item in enumerate(header) if item==fieldname]
             # Reading actual data
@@ -536,11 +593,12 @@ class visualize(object):
     A class for visualizing the features with respect to ground truth.
     """
     def __init__(self, pklfilename = 'features_gt.pkl'):
-        self.data = cp.load(open(pklfilename,'rb'))
+        self.data = cp.load(open(pklfilename,'rb n43`2`31=-hvcxzytds432'))
         print 'visualizer loaded'
     def printfeaturename(self):
         for idx,feat in enumerate(self.data['featurename']):
             print idx,'\t',feat
+        print '36-244','\t','(209) Body movement features'
     def printvideonames(self):
         for i, vidname in enumerate(np.sort(self.data['X'].keys())):
             print i,':',vidname
@@ -574,6 +632,7 @@ class visualize(object):
             plt.legend()
             plt.show()
 
+
     # Draw all the features in a 2D PCA space
     def drawpca(self,interactive=True):
         x = np.array([item for vidid_ in self.data['X'].keys() \
@@ -595,7 +654,7 @@ class visualize(object):
         plt.legend()
         plt.show()        
 
-    # Draw all the features in a 2D PCA space
+    # Draw all the features in a 2D LDA space
     def drawlda(self,interactive=True):
         x = np.array([item for vidid_ in self.data['X'].keys() \
             for item in self.data['X'][vidid_] ])
@@ -614,9 +673,16 @@ class visualize(object):
         plt.xlabel('First LDA Component')
         plt.ylabel('Second LDA Component')
         plt.legend()
-        plt.show()        
+        plt.show()
 
-###################################### Testing Module ###########################
+    # Classification of the saved data
+    def classify(self):
+        x = [[float(item) for item in dat] for vid in self.data['X'].keys()\
+            for dat in self.data['X'][vid]]
+        y = [item for vid in data['Y'].keys() for item in data['Y'][vid]]
+
+
+################################ Testing Modules ##################################
 
 # In this first approach, we assumed that if the various time-instances where
 # the same pattern occurred shows similiar words, then it means a good pattern
@@ -695,7 +761,6 @@ def secondapproach():
             '62.1']
     X_data = ddict(list)
     Y_data = ddict(list)
-    vidid=[]
     for avid in vid:
         print 'processing ...',avid
         amp.readfast(avid)
@@ -719,7 +784,6 @@ def thirdapproach():
     # for all the files, extract features
     X_data = ddict(list)
     Y_data = ddict(list)
-    vidid=[]
     # File list can be found in gt dict
     for avid in amp.gt.keys():
         print 'processing ...',avid
