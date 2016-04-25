@@ -240,7 +240,8 @@ class AutoMannerPlus(object):
         def length(v):
             return np.sqrt(v[:,0]**2.+v[:,1]**2.+v[:,2]**2.)
         features = []
-        for j in range(1,20):
+        # Calculate features for only some selected joints
+        for j in [5,6,9,10,13,14,17,18]: # range(1,20):
             # represent joints wrt the reference joint (hip)
             pos = self.bodymoves[patid][:,jid(j)]-\
             	self.bodymoves[patid][:,jid(0)]
@@ -255,12 +256,12 @@ class AutoMannerPlus(object):
             features.append(np.std(length(pos)))      # STD joint position mag
             features.append(np.std(length(vel)))      # STD joint velocity mag
             features.append(np.std(length(acc)))      # STD joint acceleration mag        
-            features.append(np.min(length(pos)))      # min joint position mag
-            features.append(np.min(length(vel)))      # min joint velocity mag
-            features.append(np.min(length(acc)))      # min joint acceleration mag
-            features.append(np.max(length(pos)))      # max joint position mag
-            features.append(np.max(length(vel)))      # max joint velocity mag
-            features.append(np.max(length(acc)))      # max joint acceleration mag
+            # features.append(np.min(length(pos)))      # min joint position mag
+            # features.append(np.min(length(vel)))      # min joint velocity mag
+            # features.append(np.min(length(acc)))      # min joint acceleration mag
+            # features.append(np.max(length(pos)))      # max joint position mag
+            # features.append(np.max(length(vel)))      # max joint velocity mag
+            # features.append(np.max(length(acc)))      # max joint acceleration mag
         return features
     
     def featurename(self):
@@ -648,12 +649,11 @@ class classify(object):
             print 'Average correlation:', np.mean(correl)
             coef = np.mean(coefs,axis=0)
             print coef[-3:],np.sum(coef[-3:])
+            print coef[:-3]
             plt.figure()
             plt.pie(coef[-3:],labels=['disfluency','prosody','body_movements'])
             plt.title('Feature weights per unit non-zero feature')
             plt.show()
-
-
     
     # Calculates the relative weights of the coefficients
     # 1. Total weights for disfluency, prosody and body features
@@ -682,10 +682,8 @@ class classify(object):
         perc_pros = rat_pros/total_rat * 100.
         perc_body = rat_body/total_rat * 100.
 
-        return sum_disf,sum_pros,sum_body,\
-        nnz_disf,nnz_pros,nnz_body,rat_disf,\
-        rat_pros,rat_body,perc_disf,perc_pros,\
-        perc_body
+        return sum_disf,sum_pros,sum_body,nnz_disf,nnz_pros,nnz_body,\
+        rat_disf,rat_pros,rat_body,perc_disf,perc_pros,perc_body
 
 class visualize(object):
     """
@@ -697,11 +695,10 @@ class visualize(object):
     def printfeaturename(self):
         for idx,feat in enumerate(self.data['featurename']):
             print idx,'\t',feat
-        print '36-244','\t','(209) Body movement features'
+        print '36 - end','\t','Body movement features'
     def printvideonames(self):
         for i, vidname in enumerate(np.sort(self.data['X'].keys())):
             print i,':',vidname
-    
     # provide indices of two features and a videoid to plot wrt gt
     def draw2features(self,featlist,vidid='all',interactive=True):
         if not len(featlist)==2:
@@ -839,8 +836,7 @@ def firstapproach():
         'w2vCorr':mean_w2v_corr,'posCorr':mean_pos_corr},\
         open('output.pkl', 'wb'))
 
-# In this approach, we just extract a number of features and then try to cluster
-# them using PCA and LDA. We can also train a classifier to predict the ground truth.
+# This approach uses the data from the participants' ratings
 def secondapproach():
     # Participants' ground truth
     alignpath = '/Users/itanveer/Data/ROCSpeak_BL/features/alignments/'
@@ -866,9 +862,9 @@ def secondapproach():
     cp.dump({'X':X_data,'Y':Y_data,'featurename':amp.featurename()},\
         open('features_gt.pkl','wb'))
 
-# This approach scales the data by utilizing the mechanical turk annotations
+# This approach uses the data from the mechanical turk annotations
 def thirdapproach():
-    # Participants' ground truth
+    # Turker's ground truth
     alignpath = '/Users/itanveer/Data/ROCSpeak_BL/features/alignments/'
     timepath = '/Users/itanveer/Data/ROCSpeak_BL/Original_Data/Results_for_MTurk/'
     gtfile = '/Users/itanveer/Data/ROCSpeak_BL/Ground-Truth/turkers_ratings.csv'
