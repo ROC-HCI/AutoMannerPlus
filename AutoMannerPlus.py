@@ -7,16 +7,27 @@ Created on Mon Mar 21 21:44:10 2016
     University of Rochester
 -------------------------------------------------------------------------------
 """
-import numpy as np
-import nltk
+# Local
 from Word2Vec import Word2Vec
+
+# Python lib
+import numpy as np
 import csv
 import cPickle as cp
 from collections import defaultdict as ddict
 from scipy.signal import resample
+import time
+
+# NLP
+import nltk
+
+# Plot related
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+
+# ML related
 import sklearn as sk
+from sklearn import linear_model
 from sklearn.decomposition import PCA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 
@@ -210,7 +221,6 @@ class AutoMannerPlus(object):
                         form_range[2],                     # third formant range
                         np.count_nonzero(pitch)/len(pitch) # percent unvoiced
                         ]
-            import pdb;pdb.set_trace()
             feats.extend(self.__calcbodyfeat__(i))         # Body movement features
             featurelist[i].append(feats)
         # ==================== feature averaging ======================
@@ -589,14 +599,67 @@ class AutoMannerPlus_mturk(AutoMannerPlus):
              for item in data_row.keys()}
 
 class classify(object):
+    '''
+    A class to apply classifiers and obtain the accuracy and other metrics
+    
+    Class variables:
+    =============== 
+    x       : Features
+    y       : Labels
+    '''
     def __init__(self,pklfilename):
-        self.data = cp.load(open(pklfilename,'rb'))
+        data = cp.load(open(pklfilename,'rb'))        
+        self.x = [[float(item) for item in dat] for vid in data['X'].keys()\
+            for dat in data['X'][vid]]
+        self.y = [item for vid in data['Y'].keys() for item in data['Y'][vid]]
+
     # Classification of the saved data
-    def classify(self):
-        x = [[float(item) for item in dat] for vid in self.data['X'].keys()\
-            for dat in self.data['X'][vid]]
-        y = [item for vid in data['Y'].keys() for item in data['Y'][vid]]
-        
+    def apply(self,
+        method='lasso', # Method of classification
+        tot_iter = 10  # Total number of repeated experiment
+        ):
+        # sparcity penalty parameter values
+        alphlist = [0.001,0.005,0.01,0.05,0.075,0.1,0.15,0.2,0.3,0.4,0.5,0.6,\
+            0.7,0.8,0.9,1.0,1.5,2,3,4,5,10,50,100,500,1000,5000,10000,50000]
+        # Train and test the classifier many times for calculating the accuracy
+        correl = []
+        for i in xrange(tot_iter):
+            print 'iter:',i
+            # One third of the data is reserved for testing
+            x_train,x_test,y_train,y_test = \
+                sk.cross_validation.train_test_split(\
+                self.x,self.y,train_size=0.3,random_state=\
+                int(time.time()*1000)%4294967295)
+            # One third of the training data is used as validation
+            x_tr,x_val,y_tr,y_val = sk.cross_validation.train_test_split(\
+                x_train,y_train,train_size=0.3,random_state=\
+                int(time.time()*1000)%4294967295)
+            # Choose a good alpha (Tune the best penalty with validation set)
+            scores=[]
+            for analpha in alphlist:
+                model = linear_model.Lasso(alpha=analpha, fit_intercept=True, \
+                    normalize=False, precompute=False, copy_X=True, \
+                    max_iter=1000000, tol=0.0001, warm_start=False, \
+                    positive=False,selection='random')
+                scores.append(model.fit(x_tr,y_tr).score(x_val,y_val))
+            # Obtaining the best model as per validation dataset
+            best_alpha = alphlist[np.argmax(scores)]
+            print 'best alpha:',best_alpha,
+            best_model = linear_model.Lasso(alpha=best_alpha,\
+                fit_intercept=True, \
+                normalize=False, precompute=False, copy_X=True, \
+                max_iter=1000000, tol=0.0001, warm_start=False, \
+                positive=False,selection='random')
+            best_model.fit(x_tr,y_tr)
+            # Prediction results
+            y_pred = best_model.predict(x_test)
+            # Calculate correlation with original
+            corr_val = np.corrcoef(y_test,y_pred)[0,1]
+            correl.append(corr_val)
+            print 'Correlation:',corr_val
+        print 'Average correlation:', np.mean(correl)
+
+
 
 class visualize(object):
     """
@@ -801,6 +864,10 @@ def thirdapproach():
     cp.dump({'X':X_data,'Y':Y_data,'featurename':amp.featurename()},\
         open('features_MT_gt.pkl','wb'))
 
+# Test of the classfiers
+def classification():
+    cls = classify('features_MT_gt.pkl')
+    cls.apply()
 
 if __name__=='__main__':
-    thirdapproach()
+    classification()
