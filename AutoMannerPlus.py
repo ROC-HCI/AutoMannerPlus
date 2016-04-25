@@ -588,12 +588,22 @@ class AutoMannerPlus_mturk(AutoMannerPlus):
             self.gt = {item:[data_row[item][idx-3] for idx in pid]\
              for item in data_row.keys()}
 
+class classify(object):
+    def __init__(self,pklfilename):
+        self.data = cp.load(open(pklfilename,'rb'))
+    # Classification of the saved data
+    def classify(self):
+        x = [[float(item) for item in dat] for vid in self.data['X'].keys()\
+            for dat in self.data['X'][vid]]
+        y = [item for vid in data['Y'].keys() for item in data['Y'][vid]]
+        
+
 class visualize(object):
     """
     A class for visualizing the features with respect to ground truth.
     """
     def __init__(self, pklfilename = 'features_gt.pkl'):
-        self.data = cp.load(open(pklfilename,'rb n43`2`31=-hvcxzytds432'))
+        self.data = cp.load(open(pklfilename,'rb'))
         print 'visualizer loaded'
     def printfeaturename(self):
         for idx,feat in enumerate(self.data['featurename']):
@@ -675,11 +685,6 @@ class visualize(object):
         plt.legend()
         plt.show()
 
-    # Classification of the saved data
-    def classify(self):
-        x = [[float(item) for item in dat] for vid in self.data['X'].keys()\
-            for dat in self.data['X'][vid]]
-        y = [item for vid in data['Y'].keys() for item in data['Y'][vid]]
 
 
 ################################ Testing Modules ##################################
