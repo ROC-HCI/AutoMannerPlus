@@ -609,6 +609,7 @@ class classify(object):
     y       : Labels
     '''
     def __init__(self,pklfilename):
+        self.filename = pklfilename
         data = cp.load(open(pklfilename,'rb'))        
         self.x = [[float(item) for item in dat] for vid in data['X'].keys()\
             for dat in data['X'][vid]]
@@ -619,41 +620,58 @@ class classify(object):
         method='lasso', # Method of classification
         tot_iter = 30  # Total number of repeated experiment
         ):
-        if method=='lasso':
-            # Train and test the classifier many times for calculating the accuracy
-            correl = []
-            coefs = []
-            for i in xrange(tot_iter):
-                print 'iter:',i,
-                # One third of the data is reserved for testing
-                x_train,x_test,y_train,y_test = \
-                    sk.cross_validation.train_test_split(\
-                    self.x,self.y,train_size=0.3,random_state=\
-                    int(time.time()*1000)%4294967295)
-                
-                # Classify
-                model = linear_model.Lasso(alpha=0.05,\
+        # Train and test the classifier many times for calculating the accuracy
+        correl = []
+        coefs = []
+        for i in xrange(tot_iter):
+            print 'iter:',i,
+            # One third of the data is reserved for testing
+            x_train,x_test,y_train,y_test = \
+                sk.cross_validation.train_test_split(\
+                self.x,self.y,train_size=0.3,random_state=\
+                int(time.time()*1000)%4294967295)
+
+            # Model Selection
+            if method=='lasso':
+                model = linear_model.Lasso(alpha=0.075,\
                     fit_intercept=True, \
                     normalize=False, precompute=False, copy_X=True, \
                     max_iter=1000000, tol=0.0001, warm_start=False, \
                     positive=False,selection='random')
-                # Training the best model
+                # Training the model
                 model.fit(x_train,y_train)
                 coefs.append(self.__coef_calc__(model.coef_))
-                # Prediction results
-                y_pred = model.predict(x_test)
-                # Calculate correlation with original
-                corr_val = np.corrcoef(y_test,y_pred)[0,1]
-                correl.append(corr_val)
-                print 'Correlation:',corr_val
-            print 'Average correlation:', np.mean(correl)
-            coef = np.mean(coefs,axis=0)
-            print coef[-3:],np.sum(coef[-3:])
-            print coef[:-3]
-            plt.figure()
-            plt.pie(coef[-3:],labels=['disfluency','prosody','body_movements'])
-            plt.title('Feature weights per unit non-zero feature')
-            plt.show()
+            elif method=='lda':
+                model = sk.discriminant_analysis.LinearDiscriminantAnalysis(
+                    solver='lsqr',
+                    shrinkage='auto')
+                # Training the model
+                model.fit(x_train,y_train)
+                coefs.append(self.__coef_calc__(np.mean(\
+                    np.abs(model.coef_),axis=0)))                
+            elif method=='svr':
+                pass
+
+            # Prediction results
+            y_pred = model.predict(x_test)
+            # Calculate correlation with original
+            corr_val = np.corrcoef(y_test,y_pred)[0,1]
+            correl.append(corr_val)
+            print 'Correlation:',corr_val
+
+        # Print feature proportions
+        print 'Average correlation:', np.mean(correl)
+        coef = np.mean(coefs,axis=0)
+        print 'disf, pros, body feature sums:',coef[:3]
+        print 'Number of disf, pros, body features:',coef[3:6]
+        print 'disf percent:',coef[-3],'prosody percent:',\
+            coef[-2],'Body Percent:', coef[-1]
+        # Visualize feature proportions
+        plt.figure(self.filename)
+        plt.pie(coef[-3:],labels=['disfluency','prosody','body_movements'])
+        plt.title('Average weight per feature. '\
+            + self.filename)
+        plt.show()
     
     # Calculates the relative weights of the coefficients
     # 1. Total weights for disfluency, prosody and body features
@@ -668,10 +686,10 @@ class classify(object):
         sum_disf = np.sum(np.abs(disf))
         sum_pros = np.sum(np.abs(pros))
         sum_body = np.sum(np.abs(body))
-        # Number of non-zeros
-        nnz_disf = np.count_nonzero(disf)
-        nnz_pros = np.count_nonzero(pros)
-        nnz_body = np.count_nonzero(body)
+        # Number of features
+        nnz_disf = len(disf)
+        nnz_pros = len(pros)
+        nnz_body = len(body)
         # ratios
         rat_disf = sum_disf/float(nnz_disf) if not nnz_disf==0 else 0.
         rat_pros = sum_pros/float(nnz_pros) if not nnz_pros==0 else 0.
@@ -756,8 +774,9 @@ class visualize(object):
             for item in self.data['X'][vidid_] ])
         y = np.array([item for vidid_ in self.data['X'].keys() \
             for item in self.data['Y'][vidid_] ])
-        lda = LDA()
-        x_project=lda.fit_transform(x,y.tolist())
+        self.lda = LDA()
+        x_project=self.lda.fit_transform(x,y.tolist())
+
         # Now plot the features
         if interactive:
             plt.ion()
@@ -888,10 +907,16 @@ def thirdapproach():
 
 # Test of the classfiers
 def classification():
-    cls = classify('features_MT_gt.pkl',)
-    cls.test_avg_corr(tot_iter=100)
-    cls = classify('features_gt.pkl',)
-    cls.test_avg_corr(tot_iter=100)
+    cls = classify('features_MT_gt.pkl')
+    cls.test_avg_corr(tot_iter=100,method='lasso')
+    cls = classify('features_gt.pkl')
+    cls.test_avg_corr(tot_iter=100,method='lasso')    
+    cls = classify('features_MT_gt.pkl')
+    cls.test_avg_corr(tot_iter=100,method='lda')
+    cls = classify('features_gt.pkl')
+    cls.test_avg_corr(tot_iter=100,method='lda')
+
+# Main
 if __name__=='__main__':
     #secondapproach()
     #thirdapproach()
