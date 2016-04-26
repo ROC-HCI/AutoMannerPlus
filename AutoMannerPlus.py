@@ -173,6 +173,7 @@ class AutoMannerPlus(object):
             spTime =[self.walign['etime'][item] - self.walign['stime'][item] for item in\
                 self.selected[i,j] if self.walign['word'][item]=='sp']
             # Prosody Features
+            import pdb;pdb.set_trace()
             loud = self.loud[int(inststime*100.):int(instetime*100.)]
             pitch = self.pitch[int(inststime*100.):int(instetime*100.)]
             formant = self.formant[int(inststime*100.):int(instetime*100.),:]
@@ -614,6 +615,10 @@ class classify(object):
         self.x = [[float(item) for item in dat] for vid in data['X'].keys()\
             for dat in data['X'][vid]]
         self.y = [item for vid in data['Y'].keys() for item in data['Y'][vid]]
+        
+        # Standardize the features, x
+        self.x = self.x - np.mean(self.x,axis=0)
+        self.x = np.nan_to_num(self.x/np.std(self.x,axis=0))
 
     # Test avg. correlation for multiple regressions
     def test_avg_corr(self,
@@ -633,7 +638,7 @@ class classify(object):
 
             # Model Selection
             if method=='lasso':
-                model = linear_model.Lasso(alpha=0.075,\
+                model = linear_model.Lasso(alpha=0.05,\
                     fit_intercept=True, \
                     normalize=False, precompute=False, copy_X=True, \
                     max_iter=1000000, tol=0.0001, warm_start=False, \
@@ -650,7 +655,12 @@ class classify(object):
                 coefs.append(self.__coef_calc__(np.mean(\
                     np.abs(model.coef_),axis=0)))                
             elif method=='svr':
-                pass
+                model = sk.svm.LinearSVR(
+                    fit_intercept=True,
+                    random_state=\
+                    int(time.time()*1000)%4294967295)
+                model.fit(x_train,y_train)
+                coefs.append(self.__coef_calc__(model.coef_))
 
             # Prediction results
             y_pred = model.predict(x_test)
@@ -915,6 +925,10 @@ def classification():
     cls.test_avg_corr(tot_iter=100,method='lda')
     cls = classify('features_gt.pkl')
     cls.test_avg_corr(tot_iter=100,method='lda')
+    cls = classify('features_MT_gt.pkl')
+    cls.test_avg_corr(tot_iter=100,method='svr')
+    cls = classify('features_gt.pkl')
+    cls.test_avg_corr(tot_iter=100,method='svr')    
 
 # Main
 if __name__=='__main__':
