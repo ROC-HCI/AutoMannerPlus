@@ -173,7 +173,6 @@ class AutoMannerPlus(object):
             spTime =[self.walign['etime'][item] - self.walign['stime'][item] for item in\
                 self.selected[i,j] if self.walign['word'][item]=='sp']
             # Prosody Features
-            import pdb;pdb.set_trace()
             loud = self.loud[int(inststime*100.):int(instetime*100.)]
             pitch = self.pitch[int(inststime*100.):int(instetime*100.)]
             formant = self.formant[int(inststime*100.):int(instetime*100.),:]
@@ -611,14 +610,30 @@ class classify(object):
     '''
     def __init__(self,pklfilename):
         self.filename = pklfilename
-        data = cp.load(open(pklfilename,'rb'))        
-        self.x = [[float(item) for item in dat] for vid in data['X'].keys()\
+        data = cp.load(open(pklfilename,'rb'))
+        # Extract from data
+        self.X = [[float(item) for item in dat] for vid in data['X'].keys()\
             for dat in data['X'][vid]]
-        self.y = [item for vid in data['Y'].keys() for item in data['Y'][vid]]
-        
+        self.y = [item for vid in data['Y'].keys() for item in data['Y'][vid]]              
+        # Use all features
+        self.usefeat()
+    # Turn on/off a specific group of features
+    def usefeat(self,disf=True,pros=True,body=True):
+        self.disf=disf
+        self.pros=pros
+        self.body=body  
         # Standardize the features, x
-        self.x = self.x - np.mean(self.x,axis=0)
-        self.x = np.nan_to_num(self.x/np.std(self.x,axis=0))
+        self.x = self.X - np.mean(self.X,axis=0)
+        self.x = np.nan_to_num(self.x/np.std(self.x,axis=0))        
+        # Select the features according to the mask
+        x_ = np.empty(0).reshape(len(self.x),0)
+        if self.disf:
+            x_ = np.hstack((x_,self.x[:,:9]))
+        if self.pros:
+            x_ = np.hstack((x_,self.x[:,9:35]))
+        if self.body:
+            x_ = np.hstack((x_,self.x[:,35:]))
+        self.x = x_
 
     # Test avg. correlation for multiple regressions
     def test_avg_corr(self,
@@ -645,23 +660,25 @@ class classify(object):
                     positive=False,selection='random')
                 # Training the model
                 model.fit(x_train,y_train)
-                coefs.append(self.__coef_calc__(model.coef_))
+                if self.disf and self.pros and self.body:
+                    coefs.append(self.__coef_calc__(model.coef_))
             elif method=='lda':
                 model = sk.discriminant_analysis.LinearDiscriminantAnalysis(
                     solver='lsqr',
                     shrinkage='auto')
                 # Training the model
                 model.fit(x_train,y_train)
-                coefs.append(self.__coef_calc__(np.mean(\
-                    np.abs(model.coef_),axis=0)))                
+                if self.disf and self.pros and self.body:
+                    coefs.append(self.__coef_calc__(np.mean(\
+                        np.abs(model.coef_),axis=0)))                
             elif method=='svr':
                 model = sk.svm.LinearSVR(
                     fit_intercept=True,
                     random_state=\
                     int(time.time()*1000)%4294967295)
                 model.fit(x_train,y_train)
-                coefs.append(self.__coef_calc__(model.coef_))
-
+                if self.disf and self.pros and self.body:
+                    coefs.append(self.__coef_calc__(model.coef_))
             # Prediction results
             y_pred = model.predict(x_test)
             # Calculate correlation with original
@@ -671,17 +688,18 @@ class classify(object):
 
         # Print feature proportions
         print 'Average correlation:', np.mean(correl)
-        coef = np.mean(coefs,axis=0)
-        print 'disf, pros, body feature sums:',coef[:3]
-        print 'Number of disf, pros, body features:',coef[3:6]
-        print 'disf percent:',coef[-3],'prosody percent:',\
-            coef[-2],'Body Percent:', coef[-1]
-        # Visualize feature proportions
-        plt.figure(self.filename)
-        plt.pie(coef[-3:],labels=['disfluency','prosody','body_movements'])
-        plt.title('Average weight per feature. '\
-            + self.filename)
-        plt.show()
+        if self.disf and self.pros and self.body:
+            coef = np.mean(coefs,axis=0)
+            print 'disf, pros, body feature sums:',coef[:3]
+            print 'Number of disf, pros, body features:',coef[3:6]
+            print 'disf percent:',coef[-3],'prosody percent:',\
+                coef[-2],'Body Percent:', coef[-1]
+            # Visualize feature proportions
+            plt.figure(self.filename)
+            plt.pie(coef[-3:],labels=['disfluency','prosody','body_movements'])
+            plt.title('Average weight per feature. '\
+                + self.filename)
+            plt.show()
     
     # Calculates the relative weights of the coefficients
     # 1. Total weights for disfluency, prosody and body features
@@ -727,6 +745,7 @@ class visualize(object):
     def printvideonames(self):
         for i, vidname in enumerate(np.sort(self.data['X'].keys())):
             print i,':',vidname
+
     # provide indices of two features and a videoid to plot wrt gt
     def draw2features(self,featlist,vidid='all',interactive=True):
         if not len(featlist)==2:
@@ -756,7 +775,6 @@ class visualize(object):
             plt.legend()
             plt.show()
 
-
     # Draw all the features in a 2D PCA space
     def drawpca(self,interactive=True):
         x = np.array([item for vidid_ in self.data['X'].keys() \
@@ -776,7 +794,7 @@ class visualize(object):
         plt.xlabel('First Principal Component')
         plt.ylabel('Second Principal Component')
         plt.legend()
-        plt.show()        
+        plt.show()
 
     # Draw all the features in a 2D LDA space
     def drawlda(self,interactive=True):
