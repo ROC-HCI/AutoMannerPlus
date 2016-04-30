@@ -115,13 +115,14 @@ class AutoMannerPlus(object):
         # Read the files
         self.__read_align__(self.alignpath+vidid+'.txt')
         self.__read_time__(self.timepath+vidid+'/timeline_'+vidid+'.csv')
-        self.__read_trans__(self.transpath+vidid+'.txt')
         self.__read_prosody__()
-        self.__read__body_movements__()        
-        # Build the links with transcript data. This part is time consuming
+        self.__read__body_movements__()
+        self.__selectwalign__()        
+        # Read original transcript and Build the links with transcript data. 
+        # This part is time consuming
+        self.__read_trans__(self.transpath+vidid+'.txt')        
         self.__buildalign2trmap__()
         self.__lnwordpatt__()
-        self.__selectwalign__()
         
     # Faster read without the transcription data. Some features don't need 
     # transcripts. However, transcript data requires a time-consuming 
@@ -133,6 +134,7 @@ class AutoMannerPlus(object):
     def readfast(self,vidid):
         self.vidid = vidid
         # Read the files
+        self.__read_facial__()
         self.__read_align__(self.alignpath+vidid+'.txt')
         self.__read_time__(self.timepath+vidid+'/timeline_'+vidid+'.csv')
         self.__read_prosody__()
@@ -231,8 +233,16 @@ class AutoMannerPlus(object):
             else:
                 del featurelist[i]
         return featurelist,gtlist
+
+
+    # This is the full version of feature extraction. call it only if you 
+    # used the readEverything (not readfast) function earlier.
+    # It calculates lexical features in addition to the original features
+    def extractAllFeatures(self):
+        raise NotImplementedError("Not implemented yet")
+        
     
-    # Calculate the body coordinates
+    # Calculate the body movement features
     def __calcbodyfeat__(self,patid):
         # jid = joint id
         def jid(j):
@@ -277,14 +287,6 @@ class AutoMannerPlus(object):
     'third formant std','first formant range','second formant range',\
     'third formant range','percent unvoiced']
         
-    def __check_fillerness__(self,wrd):
-        raise NotImplementedError
-    
-    # This is the full version of feature extraction. call it only if you 
-    # used the readEverything function earlier
-    def extractAllFeatures(self):
-        raise NotImplementedError('Not implemented yet')
-        
     # View the length of the spoken words
     def viewwordlen(self):
         # for every instances in the patterns
@@ -292,53 +294,55 @@ class AutoMannerPlus(object):
             print i,j,'=',[(self.walign['word'][item],self.walign['etime'][item]-\
             self.walign['stime'][item]) for item in self.selected[i,j]]
 
-    # Calculate the contextual similarity of the patterns. Calling this function
-    # requires full file read, not the faster version
-    def calcContextSim(self,simType='w2v'):
-        patlist = np.unique(self.patterns[:,0])
-        patsim=[]
-        # Calculate similarity through w2v
-        if simType == 'w2v':
-            # for every pattern
-            for idx in range(len(self.lnkdata)):
-                instSim=[]
-                # for every instance in the pattern
-                for i in range(len(self.w2vdata[idx])):
-                    for j in range(i):
-                        # In order to calculate similarity of a set of n 300 
-                        # dimensional vectors another set of k 300 dimensional 
-                        # vectors, we apply matrix product
-                        instSim.extend(self.w2vdata[idx][i].dot \
-                            (self.w2vdata[idx][j].T).flatten().tolist())
-                # participant's annotation
-                gtvalue = self.gt[self.vidid][np.where(patlist == \
-                    self.lnkdata[idx][0][0])[0][0]]
-                if not instSim:
-                    continue
-                simdat = (self.vidid,self.lnkdata[idx][0][0],np.mean(instSim),gtvalue)
-                patsim.append(simdat)
-                print simdat
-        # Calculate similarity through parts of speech
-        elif simType == 'pos':
-            # for every pattern
-            for idx,apat in enumerate(self.lnkdata_pos):
-                instSim=[]
-                # for every instance in the pattern
-                for i in range(len(apat)):
-                    for j in range(i):
-                        # calculate similarity by pos intersection count / pos union count
-                        instSim.append(float(len(np.intersect1d(self.lnkdata_pos[idx]\
-                        [i][1:],self.lnkdata_pos[idx][j][1:])))/ float(len(np.union1d(\
-                        self.lnkdata_pos[idx][i][1:],self.lnkdata_pos[idx][j][1:]))))
-                # participant's annotation
-                gtvalue = self.gt[self.vidid][np.where(patlist == \
-                    self.lnkdata[idx][0][0])[0][0]]
-                if not instSim:
-                    continue
-                simdat = (self.vidid,self.lnkdata[idx][0][0],np.mean(instSim),gtvalue)
-                patsim.append(simdat)
-                print simdat            
-        return patsim
+# Deprecated
+# ==========
+    # # Calculate the contextual similarity of the patterns. Calling this function
+    # # requires full file read, not the faster version
+    # def calcContextSim(self,simType='w2v'):
+    #     patlist = np.unique(self.patterns[:,0])
+    #     patsim=[]
+    #     # Calculate similarity through w2v
+    #     if simType == 'w2v':
+    #         # for every pattern
+    #         for idx in range(len(self.lnkdata)):
+    #             instSim=[]
+    #             # for every instance in the pattern
+    #             for i in range(len(self.w2vdata[idx])):
+    #                 for j in range(i):
+    #                     # In order to calculate similarity of a set of n 300 
+    #                     # dimensional vectors another set of k 300 dimensional 
+    #                     # vectors, we apply matrix product
+    #                     instSim.extend(self.w2vdata[idx][i].dot \
+    #                         (self.w2vdata[idx][j].T).flatten().tolist())
+    #             # participant's annotation
+    #             gtvalue = self.gt[self.vidid][np.where(patlist == \
+    #                 self.lnkdata[idx][0][0])[0][0]]
+    #             if not instSim:
+    #                 continue
+    #             simdat = (self.vidid,self.lnkdata[idx][0][0],np.mean(instSim),gtvalue)
+    #             patsim.append(simdat)
+    #             print simdat
+    #     # Calculate similarity through parts of speech
+    #     elif simType == 'pos':
+    #         # for every pattern
+    #         for idx,apat in enumerate(self.lnkdata_pos):
+    #             instSim=[]
+    #             # for every instance in the pattern
+    #             for i in range(len(apat)):
+    #                 for j in range(i):
+    #                     # calculate similarity by pos intersection count / pos union count
+    #                     instSim.append(float(len(np.intersect1d(self.lnkdata_pos[idx]\
+    #                     [i][1:],self.lnkdata_pos[idx][j][1:])))/ float(len(np.union1d(\
+    #                     self.lnkdata_pos[idx][i][1:],self.lnkdata_pos[idx][j][1:]))))
+    #             # participant's annotation
+    #             gtvalue = self.gt[self.vidid][np.where(patlist == \
+    #                 self.lnkdata[idx][0][0])[0][0]]
+    #             if not instSim:
+    #                 continue
+    #             simdat = (self.vidid,self.lnkdata[idx][0][0],np.mean(instSim),gtvalue)
+    #             patsim.append(simdat)
+    #             print simdat            
+    #     return patsim
 
     # This function creates a new global variable named "selected".
     def __selectwalign__(self):
@@ -399,7 +403,8 @@ class AutoMannerPlus(object):
                 temp1_pos.append([i]+temp_pos)
                
                 # Check Warning cause: Done. Nothing to do
-                arr = np.array([self.w2v.v(item) for item in temp if item and not \
+                arr = np.array([self.w2v.v(item) for item in temp \
+                    if item and not \
                     (self.w2v.v(item) == None)])
                 if not len(np.shape(arr))==2:
                     continue
@@ -409,6 +414,14 @@ class AutoMannerPlus(object):
                 self.lnkdata_pos.append(temp1_pos)
             if temp_v:
                 self.w2vdata.append(temp_v)
+    def __read_facial__(self):
+        # facial features
+        face_path = self.prosodypath.replace('prosody','facial')+\
+            self.vidid+'.mp4.csv'
+        with open(face_path,'r') as f:
+            header = f.readline().strip().split(',')
+            self.facedat = np.array([map(float,aline.strip().split(',')[:-1])\
+                for aline in f])
 
     # Read the prosody files
     def __read_prosody__(self):
@@ -528,7 +541,7 @@ class AutoMannerPlus(object):
             p_nd = bp[nd[0],nd[1]]
             if d[nd[0],nd[1]] == d[p_nd[0],p_nd[1]]:
                 self.align2trmap[p_nd[0]]=p_nd[1]
-            nd =p_nd.copy()        
+            nd = p_nd.copy()        
                 
     # Read a timeline data: patternID, startsec,endsec
     # It relabels the patterns according to the order
@@ -617,6 +630,7 @@ class classify(object):
         self.y = [item for vid in data['Y'].keys() for item in data['Y'][vid]]              
         # Use all features
         self.usefeat()
+
     # Turn on/off a specific group of features
     def usefeat(self,disf=True,pros=True,body=True):
         self.disf=disf
@@ -638,13 +652,15 @@ class classify(object):
     # Test avg. correlation for multiple regressions
     def test_avg_corr(self,
         method='lasso', # Method of classification
-        tot_iter = 30  # Total number of repeated experiment
+        tot_iter = 30,  # Total number of repeated experiment
+        show_all=False
         ):
         # Train and test the classifier many times for calculating the accuracy
         correl = []
         coefs = []
         for i in xrange(tot_iter):
-            print 'iter:',i,
+            if show_all:
+                print 'iter:',i,
             # One third of the data is reserved for testing
             x_train,x_test,y_train,y_test = \
                 sk.cross_validation.train_test_split(\
@@ -673,6 +689,7 @@ class classify(object):
                         np.abs(model.coef_),axis=0)))                
             elif method=='svr':
                 model = sk.svm.LinearSVR(
+                    C = 0.5,
                     fit_intercept=True,
                     random_state=\
                     int(time.time()*1000)%4294967295)
@@ -684,7 +701,8 @@ class classify(object):
             # Calculate correlation with original
             corr_val = np.corrcoef(y_test,y_pred)[0,1]
             correl.append(corr_val)
-            print 'Correlation:',corr_val
+            if show_all:
+                print 'Correlation:',corr_val
 
         # Print feature proportions
         print 'Average correlation:', np.mean(correl)
@@ -818,70 +836,69 @@ class visualize(object):
         plt.legend()
         plt.show()
 
-
-
 ################################ Testing Modules ##################################
-
-# In this first approach, we assumed that if the various time-instances where
-# the same pattern occurred shows similiar words, then it means a good pattern
-# This part generates a similarity score between various time-instances of the same
-# pattern and calculate the correlation between the score and the ground truth
-# However, the low value of the correlation implies this approach was not good
-def firstapproach():
-    alignpath = '/Users/itanveer/Data/ROCSpeak_BL/features/alignments/'
-    timepath = '/Users/itanveer/Data/ROCSpeak_BL/Original_Data/Results/'
-    transpath = '/Users/itanveer/Data/ROCSpeak_BL/Ground-Truth/Transcripts/'
-    gtfile = '/Users/itanveer/Data/ROCSpeak_BL/Ground-Truth/participants_ratings.csv'
-    prosodypath = '/Users/itanveer/Data/ROCSpeak_BL/features/prosody/'
+# Depricated
+# ===========
+# # In this first approach, we assumed that if the various time-instances where
+# # the same pattern occurred shows similiar words, then it means a good pattern
+# # This part generates a similarity score between various time-instances of the same
+# # pattern and calculate the correlation between the score and the ground truth
+# # However, the low value of the correlation implies this approach was not good
+# def firstapproach():
+#     alignpath = '/Users/itanveer/Data/ROCSpeak_BL/features/alignments/'
+#     timepath = '/Users/itanveer/Data/ROCSpeak_BL/Original_Data/Results/'
+#     transpath = '/Users/itanveer/Data/ROCSpeak_BL/Ground-Truth/Transcripts/'
+#     gtfile = '/Users/itanveer/Data/ROCSpeak_BL/Ground-Truth/participants_ratings.csv'
+#     prosodypath = '/Users/itanveer/Data/ROCSpeak_BL/features/prosody/'
     
-    w2v = Word2Vec()
-    w2v.load()
-    amp = AutoMannerPlus(gtfile,alignpath,timepath,prosodypath)
-    vid = ['34.1','35.2','36.1','37.2','38.1','39.2','40.1','41.2','42.1',
-            '44.1','45.2','46.1','47.2','48.1','49.2','50.1','51.2','52.1',
-            '53.2','54.1','55.2','56.1','57.2',
-            '58.1','59.2','60.1','61.2','62.1']
-    scorels_w2v=[]
-    scorels_pos=[]
-    corr_w2v=[]
-    corr_pos=[]
-    lnkdat_words=ddict(list)
-    lnkdat_pos=ddict(list)
-    for avid in vid:
-        print 'processing ... ',avid
-        # Read the necessary files
-        amp.readEverything(transpath,avid,w2v)
-        # Calculate similarity
-        score_w2v = amp.calcContextSim('w2v')
-        score_pos = amp.calcContextSim('pos')
-        scorels_w2v.append(score_w2v)
-        scorels_pos.append(score_pos)
-        # Add linked words for saving
-        lnkdat_words[avid].extend([item for item in amp.lnkdata[:]])
-        lnkdat_pos[avid].extend([item for item in amp.lnkdata_pos[:]])
-        # Calculate the correlation coefficient for this videos
-        corr_w2v_temp = np.corrcoef([arow[2] for arow in score_w2v],\
-            [arow[3] for arow in score_w2v])[0,1]
-        corr_pos_temp = np.corrcoef([arow[2] for arow in score_pos],\
-            [arow[3] for arow in score_pos])[0,1]
-        print 'w2v corr:',corr_w2v_temp, 'pos corr:',corr_pos_temp
-        # Append the data in list for averaging        
-        corr_w2v.append(corr_w2v_temp)
-        corr_pos.append(corr_pos_temp)
-    # Calculate the average
-    mean_w2v_corr = np.nanmean(corr_w2v)
-    mean_pos_corr = np.nanmean(corr_pos)
-    print 'w2v',mean_w2v_corr
-    print 'pos',mean_pos_corr
-    # Preparing and saving all data    
-    simscore_w2v = np.array([item for item in score_w2v],\
-            dtype=[('vidid','a5'),('pattern','i2'),('score','f8'),('gt','f2')])
-    simscore_pos = np.array([item for item in score_pos],\
-            dtype=[('vidid','a5'),('pattern','i2'),('score','f8'),('gt','f2')])
-    cp.dump({'simscore_w2v':simscore_w2v,'simscore_pos':simscore_pos,\
-        'words':lnkdat_words,'pos':lnkdat_pos,\
-        'w2vCorr':mean_w2v_corr,'posCorr':mean_pos_corr},\
-        open('output.pkl', 'wb'))
+#     w2v = Word2Vec()
+#     w2v.load()
+#     amp = AutoMannerPlus(gtfile,alignpath,timepath,prosodypath)
+#     vid = ['34.1','35.2','36.1','37.2','38.1','39.2','40.1','41.2','42.1',
+#             '44.1','45.2','46.1','47.2','48.1','49.2','50.1','51.2','52.1',
+#             '53.2','54.1','55.2','56.1','57.2',
+#             '58.1','59.2','60.1','61.2','62.1']
+#     scorels_w2v=[]
+#     scorels_pos=[]
+#     corr_w2v=[]
+#     corr_pos=[]
+#     lnkdat_words=ddict(list)
+#     lnkdat_pos=ddict(list)
+#     for avid in vid:
+#         print 'processing ... ',avid
+#         # Read the necessary files
+#         amp.readEverything(transpath,avid,w2v)
+#         # Calculate similarity
+#         score_w2v = amp.calcContextSim('w2v')
+#         score_pos = amp.calcContextSim('pos')
+#         scorels_w2v.append(score_w2v)
+#         scorels_pos.append(score_pos)
+#         # Add linked words for saving
+#         lnkdat_words[avid].extend([item for item in amp.lnkdata[:]])
+#         lnkdat_pos[avid].extend([item for item in amp.lnkdata_pos[:]])
+#         # Calculate the correlation coefficient for this videos
+#         corr_w2v_temp = np.corrcoef([arow[2] for arow in score_w2v],\
+#             [arow[3] for arow in score_w2v])[0,1]
+#         corr_pos_temp = np.corrcoef([arow[2] for arow in score_pos],\
+#             [arow[3] for arow in score_pos])[0,1]
+#         print 'w2v corr:',corr_w2v_temp, 'pos corr:',corr_pos_temp
+#         # Append the data in list for averaging        
+#         corr_w2v.append(corr_w2v_temp)
+#         corr_pos.append(corr_pos_temp)
+#     # Calculate the average
+#     mean_w2v_corr = np.nanmean(corr_w2v)
+#     mean_pos_corr = np.nanmean(corr_pos)
+#     print 'w2v',mean_w2v_corr
+#     print 'pos',mean_pos_corr
+#     # Preparing and saving all data    
+#     simscore_w2v = np.array([item for item in score_w2v],\
+#             dtype=[('vidid','a5'),('pattern','i2'),('score','f8'),('gt','f2')])
+#     simscore_pos = np.array([item for item in score_pos],\
+#             dtype=[('vidid','a5'),('pattern','i2'),('score','f8'),('gt','f2')])
+#     cp.dump({'simscore_w2v':simscore_w2v,'simscore_pos':simscore_pos,\
+#         'words':lnkdat_words,'pos':lnkdat_pos,\
+#         'w2vCorr':mean_w2v_corr,'posCorr':mean_pos_corr},\
+#         open('output.pkl', 'wb'))
 
 # This approach uses the data from the participants' ratings
 def secondapproach():
@@ -933,23 +950,22 @@ def thirdapproach():
     cp.dump({'X':X_data,'Y':Y_data,'featurename':amp.featurename()},\
         open('features_MT_gt.pkl','wb'))
 
-# Test of the classfiers
-def classification():
-    cls = classify('features_MT_gt.pkl')
-    cls.test_avg_corr(tot_iter=100,method='lasso')
-    cls = classify('features_gt.pkl')
-    cls.test_avg_corr(tot_iter=100,method='lasso')    
-    cls = classify('features_MT_gt.pkl')
-    cls.test_avg_corr(tot_iter=100,method='lda')
-    cls = classify('features_gt.pkl')
-    cls.test_avg_corr(tot_iter=100,method='lda')
-    cls = classify('features_MT_gt.pkl')
-    cls.test_avg_corr(tot_iter=100,method='svr')
-    cls = classify('features_gt.pkl')
-    cls.test_avg_corr(tot_iter=100,method='svr')    
-
 # Main
 if __name__=='__main__':
-    #secondapproach()
-    #thirdapproach()
-    classification()
+    # Generates the data file (Run for the first time)
+    # ================================================
+    secondapproach()
+    thirdapproach()
+
+    # Uses the data file for classification
+    # =====================================
+    # Use the mechanical turk annotations
+    # cls = classify('features_MT_gt.pkl')
+    # cls.test_avg_corr(tot_iter=100,method='lasso')
+    # cls.test_avg_corr(tot_iter=100,method='lda')
+    # cls.test_avg_corr(tot_iter=100,method='svr')
+    # # Use the participants' self annotations
+    # cls = classify('features_gt.pkl')
+    # cls.test_avg_corr(tot_iter=100,method='lasso')    
+    # cls.test_avg_corr(tot_iter=100,method='lda')
+    # cls.test_avg_corr(tot_iter=100,method='svr')    
