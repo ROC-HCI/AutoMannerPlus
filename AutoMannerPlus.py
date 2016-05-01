@@ -63,6 +63,7 @@ class AutoMannerPlus(object):
     sorted2unsorted    : A dictionary from sorted to unsorted pattern ID's
     facedat            : A dictionary from the pattern# to the corresponding
                          face data
+    bodydat            : A dict from pattern# to body movement features
 '''
     # Provide the filenames: pattern-timeline file, aligned transcript file
     def __init__(self,
@@ -126,6 +127,8 @@ class AutoMannerPlus(object):
         self.__read_trans__(self.transpath+vidid+'.txt')        
         self.__buildalign2trmap__()
         self.__lnwordpatt__()
+        # Indicate as full feature
+        self.fullfeat = True
         
     # Faster read without the transcription data. Some features don't need 
     # transcripts. However, transcript data requires a time-consuming 
@@ -143,6 +146,8 @@ class AutoMannerPlus(object):
         self.__read__body_movements__()
         self.__selectwalign__()
         self.__read_facial__()
+        # Indicate as partial feature
+        self.fullfeat = False
 
     # A method for getting the ground truth for ith pattern
     # provide a video id and a pattern number (i) for that video
@@ -233,7 +238,7 @@ class AutoMannerPlus(object):
             if not len(featurelist[i])==0:
                 featurelist[i] = np.mean(featurelist[i],axis=0).tolist()
                 # =============== Body Features (40) =====================
-                featurelist[i].extend(self.__calcbodyfeat__(i))
+                featurelist[i].extend(self.facedat[i])
                 # =============== Facial Features (24) ===================
                 featurelist[i].extend(self.facedat[i])
                 # ==================== Lexical ===========================
@@ -248,40 +253,12 @@ class AutoMannerPlus(object):
     # used the readEverything (not readfast) function earlier.
     # It calculates lexical features in addition to the original features
     def extractAllFeatures(self):
+        if not self.fullfeat:
+            raise ValueError(\
+                "Can't extract all features unless everything is loaded")
+        # It includes all the previous features
+        featlist,gtlist = self.extractfeaturesfast()
         raise NotImplementedError("Not implemented yet")
-        
-    
-    # Calculate the body movement features
-    def __calcbodyfeat__(self,patid):
-        # jid = joint id
-        def jid(j):
-            return np.arange(3*j,3*j+3)
-        def length(v):
-            return np.sqrt(v[:,0]**2.+v[:,1]**2.+v[:,2]**2.)
-        features = []
-        # Calculate features for only some selected joints
-        for j in [5,6,9,10,13,14,17,18]: # range(1,20):
-            # represent joints wrt the reference joint (hip)
-            pos = self.bodymoves[patid][:,jid(j)]-\
-            	self.bodymoves[patid][:,jid(0)]
-            # normalize length to reduce person dependency
-            pos = pos/np.mean(length(pos))
-            # calculate the velocity and accelerations
-            vel = np.diff(pos,axis=0)
-            acc = np.diff(pos,n=2,axis=0)
-            # Calculate features
-            features.append(np.mean(length(vel)))     # Mean joint velocity mag.
-            features.append(np.mean(length(acc)))     # Mean joint acceleration mag
-            features.append(np.std(length(pos)))      # STD joint position mag
-            features.append(np.std(length(vel)))      # STD joint velocity mag
-            features.append(np.std(length(acc)))      # STD joint acceleration mag        
-            # features.append(np.min(length(pos)))      # min joint position mag
-            # features.append(np.min(length(vel)))      # min joint velocity mag
-            # features.append(np.min(length(acc)))      # min joint acceleration mag
-            # features.append(np.max(length(pos)))      # max joint position mag
-            # features.append(np.max(length(vel)))      # max joint velocity mag
-            # features.append(np.max(length(acc)))      # max joint acceleration mag
-        return features
     
     def featurename(self):
         return ['Average time to speak word','Average time to speak filler word',\
@@ -447,10 +424,6 @@ class AutoMannerPlus(object):
                 else:
                     continue
             data = np.array(data)
-            # data = np.array([[float(item) if item!='' else 0.\
-            #     for item in aline.strip().split(',')[:-1]]\
-            #     for aline in dat])
-            print data.shape
             if len(data)>0:
                 data[:,0] /= FPS    # Convert the frame number to time
 
@@ -623,13 +596,68 @@ class AutoMannerPlus(object):
             
     # Method for calculating the body movement features
     def __read__body_movements__(self):
-        self.bodymoves={}
-        for apat in np.unique(self.patterns[:,0]):
-            filepath = self.timepath+self.vidid+'/'+'tdp_'+\
-                str(self.sorted2unsorted[apat])+'_'+self.vidid+'.csv'
-            with open(filepath,'r') as f:
-                self.bodymoves[apat] = np.array([[float(j) for j in \
-                    i.strip().split(',')] for i in f])
+        filepath = self.prosodypath.replace(\
+            'features','allSkeletons').replace('prosody/',self.vidid+'.csv')
+        with open(filepath,'r') as f:
+            head = f.readline()
+            # Read all data and filter the unnecessary columns
+            data = np.array([[float(item) if item else 0. for item\
+                in x.strip().split(',')] for x in f])
+            cols = np.array(list(set(range(102))-set(range(5,102,5))-\
+                set(range(6,102,5))))
+            data = data[:,cols]
+            # Calculate features
+            self.bodydat = {}
+            # for a pattern
+            for i in np.unique(self.patterns[:,0]):
+                patlist = self.patterns[self.patterns[:,0]==i]
+                feats = []
+                # for a time-instance of the pattern
+                for j in patlist:
+                    # frame-indices of this time-instance
+                    idx = np.where(np.bitwise_and(data[:,1]/1000.>=j[1], \
+                        data[:,1]/1000.<=j[2]))[0]
+                    # Bypass empty data
+                    if len(idx)==0:
+                        continue
+                    # Calculate body movement features
+                    feats.append(self.__calcbodyfeat__(data[idx,2:]))
+                # Average of instance features for each pattern
+                if len(feats)!=0:
+                    self.bodydat[i] = np.mean(feats,axis=0).tolist()
+                else:
+                    self.bodydat[i] = np.zeros(40)
+
+    # Calculate the body movement features
+    def __calcbodyfeat__(self,data):
+        # jid = joint id
+        def jid(j):
+            return np.arange(3*j,3*j+3)
+        def length(v):
+            return np.sqrt(v[:,0]**2.+v[:,1]**2.+v[:,2]**2.)
+        features = []
+        # Calculate features for only some selected joints
+        for j in [5,6,9,10,13,14,17,18]: # range(1,20):
+            # represent joints wrt the reference joint (hip)
+            pos = data[:,jid(j)]-data[:,jid(0)]
+            # normalize length to reduce person dependency
+            pos = pos/np.mean(length(pos))
+            # calculate the velocity and accelerations
+            vel = np.diff(pos,axis=0)
+            acc = np.diff(pos,n=2,axis=0)
+            # Calculate features
+            features.append(np.mean(length(vel)))     # Mean joint velocity mag.
+            features.append(np.mean(length(acc)))     # Mean joint acceleration mag
+            features.append(np.std(length(pos)))      # STD joint position mag
+            features.append(np.std(length(vel)))      # STD joint velocity mag
+            features.append(np.std(length(acc)))      # STD joint acceleration mag        
+            # features.append(np.min(length(pos)))      # min joint position mag
+            # features.append(np.min(length(vel)))      # min joint velocity mag
+            # features.append(np.min(length(acc)))      # min joint acceleration mag
+            # features.append(np.max(length(pos)))      # max joint position mag
+            # features.append(np.max(length(vel)))      # max joint velocity mag
+            # features.append(np.max(length(acc)))      # max joint acceleration mag
+        return features
 
 class AutoMannerPlus_mturk(AutoMannerPlus):
     '''
@@ -1036,7 +1064,7 @@ if __name__=='__main__':
     # Generates the data file (Run for the first time)
     # ================================================
     #secondapproach()
-    #thirdapproach()
+    thirdapproach()
 
     # Uses the data file for classification
     # =====================================
