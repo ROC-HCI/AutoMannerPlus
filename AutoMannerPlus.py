@@ -48,7 +48,7 @@ class AutoMannerPlus(object):
                          index. If an alignment word is not found in trans list (e.g. sp) then the
                          value is set to -1.
     gt                 : A dictionary from vidid (string) to the selected ground truth data.
-    patterns           : A numpy array of pattern# and its start time and end time (in sec)
+    patterns           : A numpy array of (sorted) pattern# and its start time and end time (in sec)
     vidid              : id (string) of the current video
     lnkdata            : List containing a patternid and the words spoken within that pattern. The
                          list is grouped in such a way that lnkdata[0] with return the first set of
@@ -61,6 +61,8 @@ class AutoMannerPlus(object):
     selected           : A dictionary from (pat,inst) tuple to indices of walign
                          that falls within that inst's time period.
     sorted2unsorted    : A dictionary from sorted to unsorted pattern ID's
+    facedat            : A dictionary from the pattern# to the corresponding
+                         face data
 '''
     # Provide the filenames: pattern-timeline file, aligned transcript file
     def __init__(self,
@@ -117,7 +119,8 @@ class AutoMannerPlus(object):
         self.__read_time__(self.timepath+vidid+'/timeline_'+vidid+'.csv')
         self.__read_prosody__()
         self.__read__body_movements__()
-        self.__selectwalign__()        
+        self.__selectwalign__()
+        self.__read_facial__()
         # Read original transcript and Build the links with transcript data. 
         # This part is time consuming
         self.__read_trans__(self.transpath+vidid+'.txt')        
@@ -134,12 +137,12 @@ class AutoMannerPlus(object):
     def readfast(self,vidid):
         self.vidid = vidid
         # Read the files
-        self.__read_facial__()
         self.__read_align__(self.alignpath+vidid+'.txt')
         self.__read_time__(self.timepath+vidid+'/timeline_'+vidid+'.csv')
         self.__read_prosody__()
         self.__read__body_movements__()
         self.__selectwalign__()
+        self.__read_facial__()
 
     # A method for getting the ground truth for ith pattern
     # provide a video id and a pattern number (i) for that video
@@ -223,12 +226,18 @@ class AutoMannerPlus(object):
                         form_range[2],                     # third formant range
                         np.count_nonzero(pitch)/len(pitch) # percent unvoiced
                         ]
-            feats.extend(self.__calcbodyfeat__(i))         # Body movement features
+            # Not implemented yet
             featurelist[i].append(feats)
-        # ==================== feature averaging ======================
         for i in np.unique(self.patterns[:,0]):
+             # ================= feature averaging ===================
             if not len(featurelist[i])==0:
-                featurelist[i] = np.mean(featurelist[i],axis=0)
+                featurelist[i] = np.mean(featurelist[i],axis=0).tolist()
+                # =============== Body Features (40) =====================
+                featurelist[i].extend(self.__calcbodyfeat__(i))
+                # =============== Facial Features (24) ===================
+                featurelist[i].extend(self.facedat[i])
+                # ==================== Lexical ===========================
+                # Not done yet!            
                 gtlist[i]=self.getgt(self.vidid,i)
             else:
                 del featurelist[i]
@@ -414,15 +423,64 @@ class AutoMannerPlus(object):
                 self.lnkdata_pos.append(temp1_pos)
             if temp_v:
                 self.w2vdata.append(temp_v)
+
+    # Read and extract facial features
     def __read_facial__(self):
+        # Video Frame Rate is 29.97
+        FPS = 29.97
         # facial features
         face_path = self.prosodypath.replace('prosody','facial')+\
             self.vidid+'.mp4.csv'
         with open(face_path,'r') as f:
-            header = f.readline().strip().split(',')
-            self.facedat = np.array([map(float,aline.strip().split(',')[:-1])\
-                for aline in f])
+            header = f.readline()
+            data=[]
 
+            for aline in f:
+                line = list()
+                for item in aline.strip().split(',')[:-1]:
+                    if item!='':
+                        line.append(float(item))
+                    else:
+                        break
+                if len(line)>2:
+                    data.append(line)
+                else:
+                    continue
+            data = np.array(data)
+            # data = np.array([[float(item) if item!='' else 0.\
+            #     for item in aline.strip().split(',')[:-1]]\
+            #     for aline in dat])
+            print data.shape
+            if len(data)>0:
+                data[:,0] /= FPS    # Convert the frame number to time
+
+        self.facedat = {}
+        # for a pattern
+        for i in np.unique(self.patterns[:,0]):
+            patlist = self.patterns[self.patterns[:,0]==i]
+            # Bypass empty data
+            if len(data)==0:
+                self.facedat[i] = np.zeros(24)
+                continue
+            # for a time-instance of the pattern
+            feats = []
+            for j in patlist:
+                # frame-indices of this time-instance
+                idx = np.where(np.bitwise_and(data[:,0]>=j[1], \
+                    data[:,0]<=j[2]))[0]
+                # Bypass empty data
+                if len(idx)==0:
+                    continue
+                # Mean and variance of facial features
+                face_feat = np.mean(data[idx,2:14],axis=0).tolist()
+                face_feat.extend(np.std(data[idx,2:14],axis=0).tolist())
+                feats.append(face_feat)
+            # Average of features for each instance
+            if len(feats)!=0:
+                self.facedat[i] = np.mean(feats,axis=0).tolist()
+            else:
+                self.facedat[i] = np.zeros(24)
+                
     # Read the prosody files
     def __read_prosody__(self):
         # Read loudness
@@ -632,10 +690,11 @@ class classify(object):
         self.usefeat()
 
     # Turn on/off a specific group of features
-    def usefeat(self,disf=True,pros=True,body=True):
+    def usefeat(self,disf=True,pros=True,body=True,face=True):
         self.disf=disf
         self.pros=pros
         self.body=body  
+        self.face=face
         # Standardize the features, x
         self.x = self.X - np.mean(self.X,axis=0)
         self.x = np.nan_to_num(self.x/np.std(self.x,axis=0))        
@@ -646,7 +705,10 @@ class classify(object):
         if self.pros:
             x_ = np.hstack((x_,self.x[:,9:35]))
         if self.body:
-            x_ = np.hstack((x_,self.x[:,35:]))
+            x_ = np.hstack((x_,self.x[:,35:76]))
+        if self.face:
+            x_ = np.hstack((x_,self.x[:,76:]))
+
         self.x = x_
 
     # Test avg. correlation for multiple regressions
@@ -669,32 +731,32 @@ class classify(object):
 
             # Model Selection
             if method=='lasso':
-                model = linear_model.Lasso(alpha=0.05,\
+                model = linear_model.Lasso(alpha=0.085,\
                     fit_intercept=True, \
                     normalize=False, precompute=False, copy_X=True, \
                     max_iter=1000000, tol=0.0001, warm_start=False, \
                     positive=False,selection='random')
                 # Training the model
                 model.fit(x_train,y_train)
-                if self.disf and self.pros and self.body:
+                if self.disf and self.pros and self.body and self.face:
                     coefs.append(self.__coef_calc__(model.coef_))
             elif method=='lda':
-                model = sk.discriminant_analysis.LinearDiscriminantAnalysis(
+                model = sk.discriminant_analysis.\
+                    LinearDiscriminantAnalysis(
                     solver='lsqr',
                     shrinkage='auto')
                 # Training the model
                 model.fit(x_train,y_train)
-                if self.disf and self.pros and self.body:
+                if self.disf and self.pros and self.body and self.face:
                     coefs.append(self.__coef_calc__(np.mean(\
                         np.abs(model.coef_),axis=0)))                
             elif method=='svr':
                 model = sk.svm.LinearSVR(
-                    C = 0.5,
-                    fit_intercept=True,
-                    random_state=\
+                    C = 0.65,
+                    fit_intercept=True,random_state=\
                     int(time.time()*1000)%4294967295)
                 model.fit(x_train,y_train)
-                if self.disf and self.pros and self.body:
+                if self.disf and self.pros and self.body and self.face:
                     coefs.append(self.__coef_calc__(model.coef_))
             # Prediction results
             y_pred = model.predict(x_test)
@@ -705,16 +767,27 @@ class classify(object):
                 print 'Correlation:',corr_val
 
         # Print feature proportions
+        print '======================================'
         print 'Average correlation:', np.mean(correl)
-        if self.disf and self.pros and self.body:
+        print '======================================'
+        if self.disf and self.pros and self.body and self.face:
             coef = np.mean(coefs,axis=0)
-            print 'disf, pros, body feature sums:',coef[:3]
-            print 'Number of disf, pros, body features:',coef[3:6]
-            print 'disf percent:',coef[-3],'prosody percent:',\
-                coef[-2],'Body Percent:', coef[-1]
+            print 'disf:', coef[0]
+            print 'pros:', coef[1]
+            print 'body:', coef[2]
+            print 'face:', coef[3]
+            print 'Number of disf feat:', coef[4]
+            print 'Number of pros feat:', coef[5]
+            print 'Number of body feat:', coef[6]
+            print 'Number of face feat:', coef[7]
+            print 'disf percent:',coef[-4]
+            print 'prosody percent:',coef[-3]
+            print 'Body Percent:', coef[-2]
+            print 'Face Percent:',coef[-1]
             # Visualize feature proportions
             plt.figure(self.filename)
-            plt.pie(coef[-3:],labels=['disfluency','prosody','body_movements'])
+            plt.pie(coef[-4:],labels=['disfluency','prosody',\
+                'body_movements','face'])
             plt.title('Average weight per feature. '\
                 + self.filename)
             plt.show()
@@ -725,33 +798,41 @@ class classify(object):
     # 3. Weights per unit non-zero feature
     # 4. Percent of feature categories
     def __coef_calc__(self,coef):
-        disf = coef[:9]   # Disfluency features
-        pros = coef[9:35] # Prosody features
-        body = coef[35:]  # Body features
+        disf = coef[:9]    # Disfluency features
+        pros = coef[9:35]  # Prosody features
+        body = coef[35:76] # Body features
+        face = coef[76:]   # Face features
+
         # Total weights
         sum_disf = np.sum(np.abs(disf))
         sum_pros = np.sum(np.abs(pros))
         sum_body = np.sum(np.abs(body))
+        sum_face = np.sum(np.abs(face))
         # Number of features
-        nnz_disf = len(disf)
-        nnz_pros = len(pros)
-        nnz_body = len(body)
+        count_disf = len(disf)
+        count_pros = len(pros)
+        count_body = len(body)
+        count_face = len(face)
         # ratios
-        rat_disf = sum_disf/float(nnz_disf) if not nnz_disf==0 else 0.
-        rat_pros = sum_pros/float(nnz_pros) if not nnz_pros==0 else 0.
-        rat_body = sum_body/float(nnz_body) if not nnz_body==0 else 0.
-        total_rat = rat_disf + rat_pros + rat_body
+        rat_disf = sum_disf/float(count_disf) if not count_disf==0 else 0.
+        rat_pros = sum_pros/float(count_pros) if not count_pros==0 else 0.
+        rat_body = sum_body/float(count_body) if not count_body==0 else 0.
+        rat_face = sum_face/float(count_face) if not count_face==0 else 0.
+        total_rat = rat_disf + rat_pros + rat_body + rat_face
         # percents
         perc_disf = rat_disf/total_rat * 100.
         perc_pros = rat_pros/total_rat * 100.
         perc_body = rat_body/total_rat * 100.
+        perc_face = rat_face/total_rat * 100.
 
-        return sum_disf,sum_pros,sum_body,nnz_disf,nnz_pros,nnz_body,\
-        rat_disf,rat_pros,rat_body,perc_disf,perc_pros,perc_body
+        return sum_disf,sum_pros,sum_body,sum_face,count_disf,\
+        count_pros,count_body,count_face,rat_disf,rat_pros,\
+        rat_body,rat_face,perc_disf,perc_pros,perc_body,perc_face
 
 class visualize(object):
     """
     A class for visualizing the features with respect to ground truth.
+    It doesn't visualize the classification results.
     """
     def __init__(self, pklfilename = 'features_gt.pkl'):
         self.data = cp.load(open(pklfilename,'rb'))
@@ -954,18 +1035,18 @@ def thirdapproach():
 if __name__=='__main__':
     # Generates the data file (Run for the first time)
     # ================================================
-    secondapproach()
-    thirdapproach()
+    #secondapproach()
+    #thirdapproach()
 
     # Uses the data file for classification
     # =====================================
     # Use the mechanical turk annotations
-    # cls = classify('features_MT_gt.pkl')
-    # cls.test_avg_corr(tot_iter=100,method='lasso')
-    # cls.test_avg_corr(tot_iter=100,method='lda')
-    # cls.test_avg_corr(tot_iter=100,method='svr')
+    cls = classify('features_MT_gt.pkl')
+    cls.test_avg_corr(tot_iter=100,method='lasso')
+    cls.test_avg_corr(tot_iter=100,method='lda')
+    cls.test_avg_corr(tot_iter=100,method='svr')
     # # Use the participants' self annotations
-    # cls = classify('features_gt.pkl')
-    # cls.test_avg_corr(tot_iter=100,method='lasso')    
-    # cls.test_avg_corr(tot_iter=100,method='lda')
-    # cls.test_avg_corr(tot_iter=100,method='svr')    
+    #cls = classify('features_gt.pkl')
+    #cls.test_avg_corr(tot_iter=100,method='lasso')    
+    #cls.test_avg_corr(tot_iter=100,method='lda')
+    #cls.test_avg_corr(tot_iter=100,method='svr')    
