@@ -728,71 +728,78 @@ class classify(object):
             x_ = np.hstack((x_,self.x[:,76:100]))
         if self.lex:
             x_ = np.hstack((x_,self.x[:,100:123]))
-
         self.x = x_
 
     # Test avg. correlation for multiple regressions
     def test_avg_corr(self,
         method='lasso', # Method of classification
+        task='regression', # Task can be regression or classification
         tot_iter = 30,  # Total number of repeated experiment
         show_all=False
         ):
-        # Train and test the classifier many times for calculating the accuracy
-        correl = []
-        coefs = []
-        for i in xrange(tot_iter):
-            if show_all:
-                print 'iter:',i,
-            # One third of the data is reserved for testing
-            x_train,x_test,y_train,y_test = \
-                sk.cross_validation.train_test_split(\
-                self.x,self.y,train_size=0.3,random_state=\
-                int(time.time()*1000)%4294967295)
-            # Model Selection
-            if method=='lasso':
-                model = linear_model.Lasso(alpha=0.085,\
-                    fit_intercept=True, \
-                    normalize=False, precompute=False, copy_X=True, \
-                    max_iter=1000000, tol=0.0001, warm_start=False, \
-                    positive=False,selection='random')
-                # Training the model
-                model.fit(x_train,y_train)
-                if self.disf and self.pros and self.body and self.face:
-                    modelcoef = model.coef_
-                    coefs.append(self.__coef_calc__(modelcoef))
-            elif method=='lda':
-                model = sk.discriminant_analysis.\
-                    LinearDiscriminantAnalysis(
-                    solver='lsqr',
-                    shrinkage='auto')
-                # Training the model
-                model.fit(x_train,y_train)
-                if self.disf and self.pros and self.body and self.face:
-                    modelcoef = model.coef_
-                    coefs.append(self.__coef_calc__(np.mean(\
-                        np.abs(modelcoef),axis=0)))                
-            elif method=='svr':
-                model = sk.svm.LinearSVR(
-                    C = 0.15,
-                    fit_intercept=True,random_state=\
+        if task=='regression':
+            # Train and test the classifier many times for calculating the accuracy
+            correl = []
+            coefs = []
+            for i in xrange(tot_iter):
+                if show_all:
+                    print 'iter:',i,
+                # One third of the data is reserved for testing
+                x_train,x_test,y_train,y_test = \
+                    sk.cross_validation.train_test_split(\
+                    self.x,self.y,test_size=0.3,random_state=\
                     int(time.time()*1000)%4294967295)
-                model.fit(x_train,y_train)
-                if self.disf and self.pros and self.body and self.face:
-                    modelcoef = model.coef_
-                    coefs.append(self.__coef_calc__(modelcoef))
-            # Prediction results
-            y_pred = model.predict(x_test)
-            # Calculate correlation with original
-            corr_val = np.corrcoef(y_test,y_pred)[0,1]
-            correl.append(corr_val)
-            if show_all:
-                print 'Correlation:',corr_val
+                # Model Selection
+                if method=='lasso':
+                    model = linear_model.Lasso(alpha=0.05,\
+                        fit_intercept=True, \
+                        normalize=False, precompute=False, copy_X=True, \
+                        max_iter=1000000, tol=0.0001, warm_start=False, \
+                        positive=False,selection='random')
+                    # Training the model
+                    model.fit(x_train,y_train)
+                    if self.disf and self.pros and self.body and self.face:
+                        modelcoef = model.coef_
+                        coefs.append(self.__coef_calc__(modelcoef))
+                elif method=='lda':
+                    model = sk.discriminant_analysis.\
+                        LinearDiscriminantAnalysis(
+                        solver='lsqr',
+                        shrinkage='auto')
+                    # Training the model
+                    model.fit(x_train,y_train)
+                    if self.disf and self.pros and self.body and self.face:
+                        modelcoef = model.coef_
+                        coefs.append(self.__coef_calc__(np.mean(\
+                            np.abs(modelcoef),axis=0)))                
+                elif method=='svr':
+                    model = sk.svm.LinearSVR(
+                        C = 0.25,
+                        fit_intercept=True,random_state=\
+                        int(time.time()*1000)%4294967295)
+                    model.fit(x_train,y_train)
+                    if self.disf and self.pros and self.body and self.face:
+                        modelcoef = model.coef_
+                        coefs.append(self.__coef_calc__(modelcoef))
+                # Prediction results
+                y_pred = model.predict(x_test)
+                # Calculate correlation with original
+                corr_val = np.corrcoef(y_test,y_pred)[0,1]
+                correl.append(corr_val)
+                if show_all:
+                    print 'Correlation:',corr_val
+        else:
+            raise NotImplementedError("Not implemented yet!")
 
         # Print feature proportions
         meancorrel = np.mean(correl)
         print '======================================'
-        print 'Average correlation:', meancorrel
+        if task=='regression':
+            print 'Average correlation:', meancorrel
+        else:
+            print 'Average Accuracy:', meancorrel
         print '======================================'
+        # Print grouped coefficient values
         if self.disf and self.pros and self.body and self.face and self.lex:
             coef = np.mean(coefs,axis=0)
             print 'disf:', coef[0]
@@ -811,12 +818,16 @@ class classify(object):
             print 'Face Percent:',coef[-2]
             print 'Lexical Percent:',coef[-1]
             print '--------------------------------'
-            # Print all the coef values
-            if len(np.shape(modelcoef))==2:
-                modelcoef = np.mean(modelcoef,axis=0)
-            for i in range(self.totfeat):
-                print self.featnames[i]+':',modelcoef[i]
-            print           
+        
+        if len(np.shape(modelcoef))==2:
+            modelcoef = modelcoef[0,:]
+        # Print all the sorted coef values
+        srIdx = np.argsort(-np.abs(modelcoef))
+        for i in range(self.totfeat):
+            print self.featnames[srIdx[i]]+':',modelcoef[srIdx[i]]
+        print           
+        # Plot pie charts of the grouped coefficient values
+        if self.disf and self.pros and self.body and self.face and self.lex:        
             # Visualize feature proportions
             plt.figure(self.filename)
             plt.pie(coef[-5:],labels=['disfluency','prosody',\
@@ -1074,15 +1085,16 @@ if __name__=='__main__':
     #thirdapproach()
     #fourthapproach()
 
-    # Uses the data file for classification
+    # Uses the data file for classification 
+    # (Run if the data file is generated already)
     # =====================================
     # Use the mechanical turk annotations
     cls = classify('all_features_MT_gt.pkl')
-    cls.test_avg_corr(tot_iter=100,method='lasso')
-    cls.test_avg_corr(tot_iter=100,method='lda')
-    cls.test_avg_corr(tot_iter=100,method='svr')
+    cls.test_avg_corr(tot_iter=1000,method='lasso')
+    cls.test_avg_corr(tot_iter=1000,method='lda')
+    cls.test_avg_corr(tot_iter=1000,method='svr')
     # Use the participants' self annotations
     cls = classify('all_features_gt.pkl')
-    cls.test_avg_corr(tot_iter=100,method='lasso')    
-    cls.test_avg_corr(tot_iter=100,method='lda')
-    cls.test_avg_corr(tot_iter=100,method='svr')    
+    cls.test_avg_corr(tot_iter=1000,method='lasso')    
+    cls.test_avg_corr(tot_iter=1000,method='lda')
+    cls.test_avg_corr(tot_iter=1000,method='svr')    
