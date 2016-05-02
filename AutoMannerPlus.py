@@ -51,9 +51,7 @@ class AutoMannerPlus(object):
     gt                 : A dictionary from vidid (string) to the selected ground truth data.
     patterns           : A numpy array of (sorted) pattern# and its start time and end time (in sec)
     vidid              : id (string) of the current video
-    lnkdata            : List containing a patternid and the words spoken within that pattern. The
-                         list is grouped in such a way that lnkdata[0] will return the first set of
-                         patterns (not guaranteed that the first is 0).
+    lnkdata            : A dictionary from pattern id to the words spoken within that pattern.
     lnkdata_pos        : Similar to lnkdata but contains POS
     alignpath, 
     timepath,      
@@ -115,7 +113,7 @@ class AutoMannerPlus(object):
             return self.gt[vidid][np.where(np.unique(self.patterns[:,0])==i)[0][0]] 
 
     # A method to return the names of all the active features
-    def featurename():
+    def featurename(self):
         return self.featurenames      
         
     # Extract features from the aligned transcript data
@@ -213,16 +211,18 @@ class AutoMannerPlus(object):
 
     # Extract lexical features
     def __lexical_feature__(self,patid):
-        wrdlist = [words for sublist in self.lnkdata[patid] \
-            for words in sublist[1:]]
         feat_ = {akey:0. for akey in self.liwc_categories}
+        # If the lexical feature is not available for this pattern
+        if not patid in self.lnkdata.keys():
+            return [feat_[k] for k in feat_.keys()]
+        # If lexical feature is available
+        wrdlist = [words for sublist in self.lnkdata[patid] for words in sublist]
         # Check wordlist and count the liwc categories as features
         for aword in wrdlist:
             for acat in match(self.LIWCDic,aword):
                 if acat in self.liwc_categories:
                     feat_[acat]+=1.
         return [feat_[k] for k in feat_.keys()]
-
 
     # This is the full version of feature extraction. call it only if you 
     # used the readEverything (not readfast) function earlier.
@@ -275,7 +275,6 @@ class AutoMannerPlus(object):
     # extraction. Please note, this function doesn't prepare the variables
     # align2trmap, lnkdata, lnkdata_pos. So, after calling this
     # function, those variables are either unavailable or non-updated
-    # However, this creates a new variable: selected
     def readfast(self,vidid):
         self.vidid = vidid
         # Read the files
@@ -578,8 +577,8 @@ class AutoMannerPlus(object):
     # Associate the words with patterns. Checks where the patterns appeared and
     # gets the words spoken in those regions
     def __lnwordpatt__(self):
-        self.lnkdata = []
-        self.lnkdata_pos=[]
+        self.lnkdata = {}
+        self.lnkdata_pos={}
         # Take one pattern-id at a time
         for i in np.unique(self.patterns[:,0]):
             # select the ith patterns
@@ -612,12 +611,18 @@ class AutoMannerPlus(object):
                     item in range(min(orwordidx),max(orwordidx))+[max(orwordidx)]]
                 if not temp:
                     continue
-                temp1.append([i]+temp)
-                temp1_pos.append([i]+temp_pos)
+                temp1.append(temp)
+                temp1_pos.append(temp_pos)
 
             if temp1:
-                self.lnkdata.append(temp1)
-                self.lnkdata_pos.append(temp1_pos)
+                if i in self.lnkdata.keys():
+                    self.lnkdata[i].append(temp1)
+                    self.lnkdata_pos[i].append(temp1_pos)
+                else:
+                    self.lnkdata[i] = temp1
+                    self.lnkdata_pos[i] = temp1_pos
+                
+
 
     # This function creates a new global variable named "selected".
     def __selectwalign__(self):
@@ -681,8 +686,11 @@ class classify(object):
     
     Class variables:
     =============== 
-    x       : Features
-    y       : Labels
+    x        : Features
+    y        : Labels
+    data     : All contents of the pkl file
+    totfeat  : Total number of features
+    featnames: Name of the features
     '''
     def __init__(self,pklfilename):
         self.filename = pklfilename
@@ -690,16 +698,21 @@ class classify(object):
         # Extract from data
         self.X = [[float(item) for item in dat] for vid in data['X'].keys()\
             for dat in data['X'][vid]]
-        self.y = [item for vid in data['Y'].keys() for item in data['Y'][vid]]              
+        self.y = [item for vid in data['Y'].keys() for item in data['Y'][vid]]
+        # Total number of features
+        self.totfeat = np.size(self.X,axis=1)
+        self.featnames = data['featurename']
         # Use all features
         self.usefeat()
 
     # Turn on/off a specific group of features
-    def usefeat(self,disf=True,pros=True,body=True,face=True):
+    def usefeat(self,disf=True,pros=True,body=True,face=True,lex=True):
         self.disf=disf
         self.pros=pros
         self.body=body  
         self.face=face
+        if self.totfeat==123:
+            self.lex=lex
         # Standardize the features, x
         self.x = self.X - np.mean(self.X,axis=0)
         self.x = np.nan_to_num(self.x/np.std(self.x,axis=0))        
@@ -712,7 +725,9 @@ class classify(object):
         if self.body:
             x_ = np.hstack((x_,self.x[:,35:76]))
         if self.face:
-            x_ = np.hstack((x_,self.x[:,76:]))
+            x_ = np.hstack((x_,self.x[:,76:100]))
+        if self.lex:
+            x_ = np.hstack((x_,self.x[:,100:123]))
 
         self.x = x_
 
@@ -733,7 +748,6 @@ class classify(object):
                 sk.cross_validation.train_test_split(\
                 self.x,self.y,train_size=0.3,random_state=\
                 int(time.time()*1000)%4294967295)
-
             # Model Selection
             if method=='lasso':
                 model = linear_model.Lasso(alpha=0.085,\
@@ -744,7 +758,8 @@ class classify(object):
                 # Training the model
                 model.fit(x_train,y_train)
                 if self.disf and self.pros and self.body and self.face:
-                    coefs.append(self.__coef_calc__(model.coef_))
+                    modelcoef = model.coef_
+                    coefs.append(self.__coef_calc__(modelcoef))
             elif method=='lda':
                 model = sk.discriminant_analysis.\
                     LinearDiscriminantAnalysis(
@@ -753,16 +768,18 @@ class classify(object):
                 # Training the model
                 model.fit(x_train,y_train)
                 if self.disf and self.pros and self.body and self.face:
+                    modelcoef = model.coef_
                     coefs.append(self.__coef_calc__(np.mean(\
-                        np.abs(model.coef_),axis=0)))                
+                        np.abs(modelcoef),axis=0)))                
             elif method=='svr':
                 model = sk.svm.LinearSVR(
-                    C = 0.65,
+                    C = 0.15,
                     fit_intercept=True,random_state=\
                     int(time.time()*1000)%4294967295)
                 model.fit(x_train,y_train)
                 if self.disf and self.pros and self.body and self.face:
-                    coefs.append(self.__coef_calc__(model.coef_))
+                    modelcoef = model.coef_
+                    coefs.append(self.__coef_calc__(modelcoef))
             # Prediction results
             y_pred = model.predict(x_test)
             # Calculate correlation with original
@@ -772,29 +789,40 @@ class classify(object):
                 print 'Correlation:',corr_val
 
         # Print feature proportions
+        meancorrel = np.mean(correl)
         print '======================================'
-        print 'Average correlation:', np.mean(correl)
+        print 'Average correlation:', meancorrel
         print '======================================'
-        if self.disf and self.pros and self.body and self.face:
+        if self.disf and self.pros and self.body and self.face and self.lex:
             coef = np.mean(coefs,axis=0)
             print 'disf:', coef[0]
             print 'pros:', coef[1]
             print 'body:', coef[2]
             print 'face:', coef[3]
-            print 'Number of disf feat:', coef[4]
-            print 'Number of pros feat:', coef[5]
-            print 'Number of body feat:', coef[6]
-            print 'Number of face feat:', coef[7]
-            print 'disf percent:',coef[-4]
-            print 'prosody percent:',coef[-3]
-            print 'Body Percent:', coef[-2]
-            print 'Face Percent:',coef[-1]
+            print 'lexical:',coef[4]
+            print 'Number of disf feats:', coef[5]
+            print 'Number of pros feats:', coef[6]
+            print 'Number of body feats:', coef[7]
+            print 'Number of face feats:', coef[8]
+            print 'Number of lexical feats:', coef[9]
+            print 'disf percent:',coef[-5]
+            print 'prosody percent:',coef[-4]
+            print 'Body Percent:', coef[-3]
+            print 'Face Percent:',coef[-2]
+            print 'Lexical Percent:',coef[-1]
+            print '--------------------------------'
+            # Print all the coef values
+            if len(np.shape(modelcoef))==2:
+                modelcoef = np.mean(modelcoef,axis=0)
+            for i in range(self.totfeat):
+                print self.featnames[i]+':',modelcoef[i]
+            print           
             # Visualize feature proportions
             plt.figure(self.filename)
-            plt.pie(coef[-4:],labels=['disfluency','prosody',\
-                'body_movements','face'])
+            plt.pie(coef[-5:],labels=['disfluency','prosody',\
+                'body_movements','face','lexical'])
             plt.title('Average weight per feature. '\
-                + self.filename)
+                + self.filename + ' mean coorelation ' + str(meancorrel))
             plt.show()
     
     # Calculates the relative weights of the coefficients
@@ -806,33 +834,52 @@ class classify(object):
         disf = coef[:9]    # Disfluency features
         pros = coef[9:35]  # Prosody features
         body = coef[35:76] # Body features
-        face = coef[76:]   # Face features
+        face = coef[76:100]   # Face features
+        if self.lex:
+            lexic = coef[100:123] # lexical features
 
         # Total weights
         sum_disf = np.sum(np.abs(disf))
         sum_pros = np.sum(np.abs(pros))
         sum_body = np.sum(np.abs(body))
         sum_face = np.sum(np.abs(face))
+        if self.lex:
+            sum_lexic = np.sum(np.abs(lexic))
         # Number of features
         count_disf = len(disf)
         count_pros = len(pros)
         count_body = len(body)
         count_face = len(face)
+        if self.lex:
+            count_lexic = len(lexic)
         # ratios
         rat_disf = sum_disf/float(count_disf) if not count_disf==0 else 0.
         rat_pros = sum_pros/float(count_pros) if not count_pros==0 else 0.
         rat_body = sum_body/float(count_body) if not count_body==0 else 0.
         rat_face = sum_face/float(count_face) if not count_face==0 else 0.
-        total_rat = rat_disf + rat_pros + rat_body + rat_face
+        if not self.lex:
+            total_rat = rat_disf + rat_pros + rat_body + rat_face
+        else:
+            rat_lexic = sum_lexic/float(count_lexic) if not count_lexic==0 else 0.
+            total_rat = rat_disf + rat_pros + rat_body + rat_face + rat_lexic
         # percents
         perc_disf = rat_disf/total_rat * 100.
         perc_pros = rat_pros/total_rat * 100.
         perc_body = rat_body/total_rat * 100.
         perc_face = rat_face/total_rat * 100.
+        if self.lex:
+            perc_lexic = rat_lexic/total_rat * 100.
 
-        return sum_disf,sum_pros,sum_body,sum_face,count_disf,\
-        count_pros,count_body,count_face,rat_disf,rat_pros,\
-        rat_body,rat_face,perc_disf,perc_pros,perc_body,perc_face
+        if not self.lex:
+            return sum_disf,sum_pros,sum_body,sum_face,count_disf,\
+            count_pros,count_body,count_face,rat_disf,rat_pros,\
+            rat_body,rat_face,perc_disf,perc_pros,perc_body,perc_face
+        else:
+            return sum_disf,sum_pros,sum_body,sum_face,sum_lexic,count_disf,\
+            count_pros,count_body,count_face,count_lexic,rat_disf,rat_pros,\
+            rat_body,rat_face,rat_lexic,perc_disf,perc_pros,perc_body,\
+            perc_face,perc_lexic
+
 
 class visualize(object):
     """
@@ -977,18 +1024,20 @@ def fourthapproach():
     # Turker's ground truth
     alignpath = '/Users/itanveer/Data/ROCSpeak_BL/features/alignments/'
     timepath = '/Users/itanveer/Data/ROCSpeak_BL/Original_Data/Results_for_MTurk/'
-    gtfile = '/Users/itanveer/Data/ROCSpeak_BL/Ground-Truth/turkers_ratings.csv'
+    gtfile_turk = '/Users/itanveer/Data/ROCSpeak_BL/Ground-Truth/turkers_ratings.csv'
+    gtfile = '/Users/itanveer/Data/ROCSpeak_BL/Ground-Truth/participants_ratings.csv'    
     prosodypath = '/Users/itanveer/Data/ROCSpeak_BL/features/prosody/'
     transpath = '/Users/itanveer/Data/ROCSpeak_BL/Ground-Truth/Transcripts/'
-    # Feature extraction with Mechanical Turk ground truth
-    amp_m = AutoMannerPlus_mturk(gtfile,alignpath,timepath,prosodypath)
-    amp = AutoMannerPlus_mturk(gtfile,alignpath,timepath,prosodypath)
+
     # ===================== Participants ============================
-    # for all the files, extract features
+    amp = AutoMannerPlus(gtfile,alignpath,timepath,prosodypath)
+    vid = ['34.1','35.2','36.1','37.2','38.1','39.2','40.1','41.2','42.1',
+            '44.1','45.2','46.1','47.2','48.1','49.2','50.1','51.2','52.1',
+            '53.2','54.1','55.2','56.1','57.2','58.1','59.2','60.1','61.2',
+            '62.1']
     X_data = ddict(list)
     Y_data = ddict(list)
-    # File list can be found in gt dict
-    for avid in amp.gt.keys():
+    for avid in vid:
         print 'processing ...',avid
         amp.readEverything(transpath,avid)
         features,gt_ = amp.extractAllFeatures()
@@ -996,11 +1045,12 @@ def fourthapproach():
         for i in features.keys():
             X_data[avid].append(features[i])
             Y_data[avid].append(gt_[i])
-    print 'Dump all data to all_features_MT_gt.pkl file'
+    print 'Dump all data to all_features_gt.pkl file'
     cp.dump({'X':X_data,'Y':Y_data,'featurename':\
         amp.featurename()},open('all_features_gt.pkl','wb'))
     # ======================== MTURK ================================
     # for all the files, extract features
+    amp_m = AutoMannerPlus_mturk(gtfile_turk,alignpath,timepath,prosodypath)
     X_data = ddict(list)
     Y_data = ddict(list)
     # File list can be found in gt dict
@@ -1022,17 +1072,17 @@ if __name__=='__main__':
     # ================================================
     #secondapproach()
     #thirdapproach()
-    fourthapproach()
+    #fourthapproach()
 
     # Uses the data file for classification
     # =====================================
     # Use the mechanical turk annotations
-    # cls = classify('all_features_MT_gt.pkl')
-    # cls.test_avg_corr(tot_iter=100,method='lasso')
-    # cls.test_avg_corr(tot_iter=100,method='lda')
-    # cls.test_avg_corr(tot_iter=100,method='svr')
-    # # # Use the participants' self annotations
-    # cls = classify('all_features_gt.pkl')
-    # cls.test_avg_corr(tot_iter=100,method='lasso')    
-    # cls.test_avg_corr(tot_iter=100,method='lda')
-    # cls.test_avg_corr(tot_iter=100,method='svr')    
+    cls = classify('all_features_MT_gt.pkl')
+    cls.test_avg_corr(tot_iter=100,method='lasso')
+    cls.test_avg_corr(tot_iter=100,method='lda')
+    cls.test_avg_corr(tot_iter=100,method='svr')
+    # Use the participants' self annotations
+    cls = classify('all_features_gt.pkl')
+    cls.test_avg_corr(tot_iter=100,method='lasso')    
+    cls.test_avg_corr(tot_iter=100,method='lda')
+    cls.test_avg_corr(tot_iter=100,method='svr')    
