@@ -9,6 +9,7 @@ Created on Mon Mar 21 21:44:10 2016
 """
 # Local
 from Word2Vec import Word2Vec
+from LIWC_processor import *
 
 # Python lib
 import numpy as np
@@ -51,7 +52,7 @@ class AutoMannerPlus(object):
     patterns           : A numpy array of (sorted) pattern# and its start time and end time (in sec)
     vidid              : id (string) of the current video
     lnkdata            : List containing a patternid and the words spoken within that pattern. The
-                         list is grouped in such a way that lnkdata[0] with return the first set of
+                         list is grouped in such a way that lnkdata[0] will return the first set of
                          patterns (not guaranteed that the first is 0).
     lnkdata_pos        : Similar to lnkdata but contains POS
     alignpath, 
@@ -63,6 +64,10 @@ class AutoMannerPlus(object):
     facedat            : A dictionary from the pattern# to the corresponding
                          face data
     bodydat            : A dict from pattern# to body movement features
+    liwc_categories    : List of LIWC category ID's used as features
+    LIWCDic            : A dictionary from word to corresponding category ID's
+    categories         : A dictionary from LIWC category ID to category name
+    featurenames       : A list of all the features (grows with additional file read)
 '''
     # Provide the filenames: pattern-timeline file, aligned transcript file
     def __init__(self,
@@ -76,27 +81,25 @@ class AutoMannerPlus(object):
         self.alignpath = alignpath
         self.timepath = timepath
         self.prosodypath = prosodypath
+        self.jointlist = [5,6,9,10,13,14,17,18]
         self.filler = ['uhh', 'um', 'uh', 'umm', 'like','say','basically',\
         'so', 'ah', 'umhum', 'uhum', 'uhm','oh','oho','oooh','huh','ah','aha']
-    
-    # Reads the ground truth data files and makes the global gt variable
-    # the fieldname variable contains the name of the columns that we are interested in
-    # PID contains the indices for the column titled "This body movement pattern conveys a meaning"
-    def __readGT__(self,
-        filename,
-        fieldname='This body movement pattern conveys a meaning.'
-        ):
-        alldata = []
-        with open(filename,'r') as f:
-            # reading the header and calculating column id (pid) for meaningfulness rating
-            header = f.readline().split(',')[1:]
-            pid = [idx for idx,item in enumerate(header) if item==fieldname]
-            # Reading actual data
-            for arow in csv.reader(f):
-                alldata.append([item if i==0 else float(item) if item else 0. \
-                    for i,item in enumerate(arow[1:])])
-            # Make dict
-            self.gt = {item[0]:[item[idx] for idx in pid] for item in alldata}
+        self.liwc_categories = [2,4,5,8,10,11,16,17,18,20,21,22,126,127,128,129,130,131,\
+            137,140,250,354,463,464]
+        self.LIWCDic = ReadLIWCDictionary('./liwcdic2007.dic')
+        self.categories = ReadLIWCCategories('./liwccat2007.txt')
+        # Add feature names
+        self.featurenames = ['Average time to speak word','Average time to speak filler word',\
+            'Average pause length','Total number of words','Total number of filler words',\
+            'Total number of pauses','% of word per instance','% of filler per instance',\
+            '% of pause per instance','Mean loudness','Minimum loudness','Maximum loudness',\
+            'loudness range','loudness standard deviation','Mean pitch','Minimum pitch',\
+            'Maximum pitch','pitch range','pitch standard deviation','Minimum first formant',\
+            'Minimum second formant','Minimum third formant','Maximum first formant',\
+            'Maximum second formant','Maximum third formant','Mean first formant',\
+            'Mean second formant','Mean third formant','first formant std','second formant std',\
+            'third formant std','first formant range','second formant range',\
+            'third formant range','percent unvoiced']
 
     # A convenience function to view the ground truth data
     def viewgt(self):
@@ -106,48 +109,14 @@ class AutoMannerPlus(object):
             print apat,'\t','\t',self.sorted2unsorted[apat],\
                 '\t','\t',self.gt[self.vidid][idx]
 
-    # Read files in full detail.
-    def readEverything(self,transpath,vidid):
-        self.transpath = transpath
-        self.vidid = vidid
-        # Read the files
-        self.__read_align__(self.alignpath+vidid+'.txt')
-        self.__read_time__(self.timepath+vidid+'/timeline_'+vidid+'.csv')
-        self.__read_prosody__()
-        self.__read__body_movements__()
-        self.__selectwalign__()
-        self.__read_facial__()
-        # Read original transcript and Build the links with transcript data. 
-        # This part is time consuming
-        self.__read_trans__(self.transpath+vidid+'.txt')        
-        self.__buildalign2trmap__()
-        self.__lnwordpatt__()
-        # Indicate as full feature
-        self.fullfeat = True
-        
-    # Faster read without the transcription data. Some features don't need 
-    # transcripts. However, transcript data requires a time-consuming 
-    # alignment process which could be avoided in a faster group of feature
-    # extraction. Please note, this function doesn't prepare the variables
-    # align2trmap, lnkdata, lnkdata_pos. So, after calling this
-    # function, those variables are either unavailable or non-updated
-    # However, this creates a new variable: selected
-    def readfast(self,vidid):
-        self.vidid = vidid
-        # Read the files
-        self.__read_align__(self.alignpath+vidid+'.txt')
-        self.__read_time__(self.timepath+vidid+'/timeline_'+vidid+'.csv')
-        self.__read_prosody__()
-        self.__read__body_movements__()
-        self.__selectwalign__()
-        self.__read_facial__()
-        # Indicate as partial feature
-        self.fullfeat = False
-
     # A method for getting the ground truth for ith pattern
     # provide a video id and a pattern number (i) for that video
     def getgt(self,vidid,i):
-            return self.gt[vidid][np.where(np.unique(self.patterns[:,0])==i)[0][0]]        
+            return self.gt[vidid][np.where(np.unique(self.patterns[:,0])==i)[0][0]] 
+
+    # A method to return the names of all the active features
+    def featurename():
+        return self.featurenames      
         
     # Extract features from the aligned transcript data
     # Features extracted in this function are as follows (per instance):
@@ -226,14 +195,14 @@ class AutoMannerPlus(object):
                         form_range[2],                     # third formant range
                         np.count_nonzero(pitch)/len(pitch) # percent unvoiced
                         ]
-            # Not implemented yet
+            # Add features
             featurelist[i].append(feats)
         for i in np.unique(self.patterns[:,0]):
              # ================= feature averaging ===================
             if not len(featurelist[i])==0:
                 featurelist[i] = np.mean(featurelist[i],axis=0).tolist()
                 # =============== Body Features (40) =====================
-                featurelist[i].extend(self.facedat[i])
+                featurelist[i].extend(self.bodydat[i])
                 # =============== Facial Features (24) ===================
                 featurelist[i].extend(self.facedat[i])
                 # Ground truth
@@ -241,6 +210,18 @@ class AutoMannerPlus(object):
             else:
                 del featurelist[i]
         return featurelist,gtlist
+
+    # Extract lexical features
+    def __lexical_feature__(self,patid):
+        wrdlist = [words for sublist in self.lnkdata[patid] \
+            for words in sublist[1:]]
+        feat_ = {akey:0. for akey in self.liwc_categories}
+        # Check wordlist and count the liwc categories as features
+        for aword in wrdlist:
+            for acat in match(self.LIWCDic,aword):
+                if acat in self.liwc_categories:
+                    feat_[acat]+=1.
+        return [feat_[k] for k in feat_.keys()]
 
 
     # This is the full version of feature extraction. call it only if you 
@@ -253,21 +234,14 @@ class AutoMannerPlus(object):
                 Use readEverything.")
         # It includes all the previous features
         featlist,gtlist = self.extractfeaturesfast()
-        # Extract the 
-        raise NotImplementedError("Not implemented yet")
-    
-    def featurename(self):
-        return ['Average time to speak word','Average time to speak filler word',\
-    'Average pause length','Total number of words','Total number of filler words',\
-    'Total number of pauses','% of word per instance','% of filler per instance',\
-    '% of pause per instance','Mean loudness','Minimum loudness','Maximum loudness',\
-    'loudness range','loudness standard deviation','Mean pitch','Minimum pitch',\
-    'Maximum pitch','pitch range','pitch standard deviation','Minimum first formant',\
-    'Minimum second formant','Minimum third formant','Maximum first formant',\
-    'Maximum second formant','Maximum third formant','Mean first formant',\
-    'Mean second formant','Mean third formant','first formant std','second formant std',\
-    'third formant std','first formant range','second formant range',\
-    'third formant range','percent unvoiced']
+        # Extract lexical features for each pattern
+        for i in featlist.keys():
+            feat_ = self.__lexical_feature__(i)
+            featlist[i].extend(feat_)
+        # Append lexical feature names
+        featname = ['count_'+self.categories[item] for item in self.liwc_categories]
+        self.featurenames.extend(featname)
+        return featlist,gtlist
         
     # View the length of the spoken words
     def viewwordlen(self):
@@ -276,66 +250,62 @@ class AutoMannerPlus(object):
             print i,j,'=',[(self.walign['word'][item],self.walign['etime'][item]-\
             self.walign['stime'][item]) for item in self.selected[i,j]]
 
-    # This function creates a new global variable named "selected".
-    def __selectwalign__(self):
-        self.selected={}
-        # Take one pattern-id at a time
-        for i in np.unique(self.patterns[:,0]):
-            # select the ith patterns
-            ith = self.patterns[self.patterns[:,0]==i,:]
-            # Take one timeline-instance at a time. Idx is the index of time-instance
-            for idx,j in enumerate(ith):
-                # get indices of words occuring within the range of the patterns.
-                # j+-0.5 is done to increase the pattern width by 1 sec
-                temp = np.where(np.logical_and(self.walign['stime']>=max(0.,j[1]-\
-                            0.25),self.walign['etime']<=min(np.max(\
-                            self.walign['etime']),j[2]+0.25)))[0].tolist()
-                if temp:
-                    self.selected[(i,idx)] = temp
-    
-    # Associate the words with patterns. Checks where the patterns appeared and
-    # gets the words spoken in those regions
-    def __lnwordpatt__(self):
-        self.lnkdata = []
-        self.lnkdata_pos=[]
-        # Take one pattern-id at a time
-        for i in np.unique(self.patterns[:,0]):
-            # select the ith patterns
-            ith = self.patterns[self.patterns[:,0]==i,:]            
-            temp1 = []
-            temp1_pos=[]
-            temp_v=[]
-            # Take one timeline-instance at a time
-            for idx,j in enumerate(ith):
-                # get indices of words occuring within the range of the patterns.
-                # j+-0.5 is done to increase the pattern width by 1 sec
-                selected = np.where(np.logical_and(self.walign['stime']>=max(0.,j[1]-\
-                            0.25),self.walign['etime']<=min(np.max(\
-                            self.walign['etime']),j[2]+0.25)))[0]
-                if np.size(selected)==0:
-                    continue
-                # Use this selected region to extract all the words from the original
-                # transcript within this region, including the words
-                # that got skipped while forced alignments
-                orwordidx = [self.align2trmap[item] for item in selected.tolist() if\
-                    not self.align2trmap[item]==-1]
-                if not orwordidx:
-                    continue
-                # getting the word indices from the original transcript 
-                # within the pattern range
-                temp = [self.trans[item].strip().lower() for \
-                    item in range(min(orwordidx),max(orwordidx))+[max(orwordidx)]]
-                # Get POS
-                temp_pos = [ self.pos[item].strip().lower() for \
-                    item in range(min(orwordidx),max(orwordidx))+[max(orwordidx)]]
-                if not temp:
-                    continue
-                temp1.append([i]+temp)
-                temp1_pos.append([i]+temp_pos)
+    # Read files in full detail.
+    def readEverything(self,transpath,vidid):
+        self.transpath = transpath
+        self.vidid = vidid
+        # Read the files
+        self.__read_align__(self.alignpath+vidid+'.txt')
+        self.__read_time__(self.timepath+vidid+'/timeline_'+vidid+'.csv')
+        self.__read_prosody__()
+        self.__read__body_movements__()
+        self.__selectwalign__()
+        self.__read_facial__()
+        # Read original transcript and Build the links with transcript data. 
+        # This part is time consuming
+        self.__read_trans__(self.transpath+vidid+'.txt')        
+        self.__buildalign2trmap__()
+        self.__lnwordpatt__()
+        # Indicate as full feature
+        self.fullfeat = True
+        
+    # Faster read without the transcription data. Some features don't need 
+    # transcripts. However, transcript data requires a time-consuming 
+    # alignment process which could be avoided in a faster group of feature
+    # extraction. Please note, this function doesn't prepare the variables
+    # align2trmap, lnkdata, lnkdata_pos. So, after calling this
+    # function, those variables are either unavailable or non-updated
+    # However, this creates a new variable: selected
+    def readfast(self,vidid):
+        self.vidid = vidid
+        # Read the files
+        self.__read_align__(self.alignpath+vidid+'.txt')
+        self.__read_time__(self.timepath+vidid+'/timeline_'+vidid+'.csv')
+        self.__read_prosody__()
+        self.__read__body_movements__()
+        self.__selectwalign__()
+        self.__read_facial__()
+        # Indicate as partial feature
+        self.fullfeat = False
 
-            if temp1:
-                self.lnkdata.append(temp1)
-                self.lnkdata_pos.append(temp1_pos)
+    # Reads the ground truth data files and makes the global gt variable
+    # the fieldname variable contains the name of the columns that we are interested in
+    # PID contains the indices for the column titled "This body movement pattern conveys a meaning"
+    def __readGT__(self,
+        filename,
+        fieldname='This body movement pattern conveys a meaning.'
+        ):
+        alldata = []
+        with open(filename,'r') as f:
+            # reading the header and calculating column id (pid) for meaningfulness rating
+            header = f.readline().split(',')[1:]
+            pid = [idx for idx,item in enumerate(header) if item==fieldname]
+            # Reading actual data
+            for arow in csv.reader(f):
+                alldata.append([item if i==0 else float(item) if item else 0. \
+                    for i,item in enumerate(arow[1:])])
+            # Make dict
+            self.gt = {item[0]:[item[idx] for idx in pid] for item in alldata}
 
     # Read and extract facial features
     def __read_facial__(self):
@@ -345,9 +315,9 @@ class AutoMannerPlus(object):
         face_path = self.prosodypath.replace('prosody','facial')+\
             self.vidid+'.mp4.csv'
         with open(face_path,'r') as f:
-            header = f.readline()
+            header = f.readline().strip().split(',')
             data=[]
-
+            # read each line from file
             for aline in f:
                 line = list()
                 for item in aline.strip().split(',')[:-1]:
@@ -362,7 +332,7 @@ class AutoMannerPlus(object):
             data = np.array(data)
             if len(data)>0:
                 data[:,0] /= FPS    # Convert the frame number to time
-
+        # Pattern-wise assignment
         self.facedat = {}
         # for a pattern
         for i in np.unique(self.patterns[:,0]):
@@ -389,6 +359,11 @@ class AutoMannerPlus(object):
                 self.facedat[i] = np.mean(feats,axis=0).tolist()
             else:
                 self.facedat[i] = np.zeros(24)
+        # Add feature names
+        feat_name=[]
+        feat_name.extend(['mean_'+ahead for ahead in header[2:14]])
+        feat_name.extend(['std_'+ahead for ahead in header[2:14]])
+        self.featurenames.extend(feat_name)
                 
     # Read the prosody files
     def __read_prosody__(self):
@@ -476,6 +451,96 @@ class AutoMannerPlus(object):
             txt = f.read().decode('utf-8')
         self.trans = nltk.word_tokenize(txt.lower())
         self.pos = [item[1] for item in nltk.pos_tag(self.trans)]
+                
+    # Read a timeline data: patternID, startsec,endsec
+    # It relabels the patterns according to the order
+    # of the highest frequency
+    def __read_time__(self,filename):
+        with open(filename,'r') as f:
+            f.readline()
+            self.patterns = np.array([[rows[0]]+rows[2:].strip().split(',')[1:]\
+                for rows in f],dtype=int)
+            patdat_cpy = self.patterns[:,0].copy()
+            # Relabeling the patterns
+            freq = np.bincount(self.patterns[:,0])
+            srti = np.argsort(-freq,kind='mergesort')
+            for i,item in enumerate(srti):
+                patdat_cpy[self.patterns[:,0]==item]=i
+            # filling the sorted2unsorted variable
+            self.sorted2unsorted = {item1:item2 for item1,item2\
+                in zip(patdat_cpy,self.patterns[:,0])}
+            # Relabeling the original
+            self.patterns[:,0]=patdat_cpy
+            
+    # Method for calculating the body movement features.
+    def __read__body_movements__(self):
+        # Get Skeleton file path
+        filepath = self.prosodypath.replace(\
+            'features','allSkeletons').replace('prosody/',self.vidid+'.csv')
+        with open(filepath,'r') as f:
+            head = f.readline().strip().split(',')
+            # Read all data and filter the unnecessary columns
+            data = np.array([[float(item) if item else 0. for item\
+                in x.strip().split(',')] for x in f])
+        cols = np.array(list(set(range(102))-set(range(5,102,5))-\
+            set(range(6,102,5))))
+        data = data[:,cols]
+        head = [head[item] for item in cols[2:]]
+        # Calculate features
+        self.bodydat = {}
+        # for a pattern
+        for i in np.unique(self.patterns[:,0]):
+            patlist = self.patterns[self.patterns[:,0]==i]
+            feats = []
+            # for a time-instance of the pattern
+            for j in patlist:
+                # frame-indices of this time-instance
+                idx = np.where(np.bitwise_and(data[:,1]/1000.>=j[1], \
+                    data[:,1]/1000.<=j[2]))[0]
+                # Bypass empty data
+                if len(idx)==0:
+                    continue
+                # Calculate body movement features
+                feats.append(self.__calcbodyfeat__(data[idx,2:]))
+            # Average of instance features for each pattern
+            if len(feats)!=0:
+                self.bodydat[i] = np.mean(feats,axis=0).tolist()
+            else:
+                self.bodydat[i] = np.zeros(40)
+        # Add feature-names
+        feat_list = []
+        for j in self.jointlist:
+            feat_list.extend(['mean_vel_'+head[3*j][:-2],
+            'mean_acc_'+head[3*j][:-2],
+            'std_pos_'+head[3*j][:-2],
+            'std_vel_'+head[3*j][:-2],
+            'std_acc_'+head[3*j][:-2]])
+        self.featurenames.extend(feat_list)
+
+    # Calculate the body movement features
+    def __calcbodyfeat__(self,data):
+        # jid = joint id
+        def jid(j):
+            return np.arange(3*j,3*j+3)
+        def length(v):
+            return np.sqrt(v[:,0]**2.+v[:,1]**2.+v[:,2]**2.)
+        features = []
+        # Calculate features for only some selected joints
+        for j in self.jointlist:
+            # represent joints wrt the reference joint (hip)
+            pos = data[:,jid(j)]-data[:,jid(0)]
+            # normalize length to reduce person dependency
+            pos = pos/np.mean(length(pos))
+            # calculate the velocity and accelerations
+            vel = np.diff(pos,axis=0)
+            acc = np.diff(pos,n=2,axis=0)
+            # Calculate features
+            features.append(np.mean(length(vel)))     # Mean joint velocity mag
+            features.append(np.mean(length(acc)))     # Mean joint acceleration mag
+            features.append(np.std(length(pos)))      # STD joint position mag
+            features.append(np.std(length(vel)))      # STD joint velocity mag
+            features.append(np.std(length(acc)))      # STD joint acceleration mag
+        return features
 
     # Create a map frm the alignment word to the transcript word (ignore sp)
     # using dynamic programming. This is important because the aligned 
@@ -508,92 +573,68 @@ class AutoMannerPlus(object):
             p_nd = bp[nd[0],nd[1]]
             if d[nd[0],nd[1]] == d[p_nd[0],p_nd[1]]:
                 self.align2trmap[p_nd[0]]=p_nd[1]
-            nd = p_nd.copy()        
-                
-    # Read a timeline data: patternID, startsec,endsec
-    # It relabels the patterns according to the order
-    # of the highest frequency
-    def __read_time__(self,filename):
-        with open(filename,'r') as f:
-            f.readline()
-            self.patterns = np.array([[rows[0]]+rows[2:].strip().split(',')[1:]\
-                for rows in f],dtype=int)
-            patdat_cpy = self.patterns[:,0].copy()
-            # Relabeling the patterns
-            freq = np.bincount(self.patterns[:,0])
-            srti = np.argsort(-freq,kind='mergesort')
-            for i,item in enumerate(srti):
-                patdat_cpy[self.patterns[:,0]==item]=i
-            # filling the sorted2unsorted variable
-            self.sorted2unsorted = {item1:item2 for item1,item2\
-                in zip(patdat_cpy,self.patterns[:,0])}
-            # Relabeling the original
-            self.patterns[:,0]=patdat_cpy
-            
-    # Method for calculating the body movement features
-    def __read__body_movements__(self):
-        filepath = self.prosodypath.replace(\
-            'features','allSkeletons').replace('prosody/',self.vidid+'.csv')
-        with open(filepath,'r') as f:
-            head = f.readline()
-            # Read all data and filter the unnecessary columns
-            data = np.array([[float(item) if item else 0. for item\
-                in x.strip().split(',')] for x in f])
-            cols = np.array(list(set(range(102))-set(range(5,102,5))-\
-                set(range(6,102,5))))
-            data = data[:,cols]
-            # Calculate features
-            self.bodydat = {}
-            # for a pattern
-            for i in np.unique(self.patterns[:,0]):
-                patlist = self.patterns[self.patterns[:,0]==i]
-                feats = []
-                # for a time-instance of the pattern
-                for j in patlist:
-                    # frame-indices of this time-instance
-                    idx = np.where(np.bitwise_and(data[:,1]/1000.>=j[1], \
-                        data[:,1]/1000.<=j[2]))[0]
-                    # Bypass empty data
-                    if len(idx)==0:
-                        continue
-                    # Calculate body movement features
-                    feats.append(self.__calcbodyfeat__(data[idx,2:]))
-                # Average of instance features for each pattern
-                if len(feats)!=0:
-                    self.bodydat[i] = np.mean(feats,axis=0).tolist()
-                else:
-                    self.bodydat[i] = np.zeros(40)
+            nd = p_nd.copy()                
 
-    # Calculate the body movement features
-    def __calcbodyfeat__(self,data):
-        # jid = joint id
-        def jid(j):
-            return np.arange(3*j,3*j+3)
-        def length(v):
-            return np.sqrt(v[:,0]**2.+v[:,1]**2.+v[:,2]**2.)
-        features = []
-        # Calculate features for only some selected joints
-        for j in [5,6,9,10,13,14,17,18]: # range(1,20):
-            # represent joints wrt the reference joint (hip)
-            pos = data[:,jid(j)]-data[:,jid(0)]
-            # normalize length to reduce person dependency
-            pos = pos/np.mean(length(pos))
-            # calculate the velocity and accelerations
-            vel = np.diff(pos,axis=0)
-            acc = np.diff(pos,n=2,axis=0)
-            # Calculate features
-            features.append(np.mean(length(vel)))     # Mean joint velocity mag.
-            features.append(np.mean(length(acc)))     # Mean joint acceleration mag
-            features.append(np.std(length(pos)))      # STD joint position mag
-            features.append(np.std(length(vel)))      # STD joint velocity mag
-            features.append(np.std(length(acc)))      # STD joint acceleration mag        
-            # features.append(np.min(length(pos)))      # min joint position mag
-            # features.append(np.min(length(vel)))      # min joint velocity mag
-            # features.append(np.min(length(acc)))      # min joint acceleration mag
-            # features.append(np.max(length(pos)))      # max joint position mag
-            # features.append(np.max(length(vel)))      # max joint velocity mag
-            # features.append(np.max(length(acc)))      # max joint acceleration mag
-        return features
+    # Associate the words with patterns. Checks where the patterns appeared and
+    # gets the words spoken in those regions
+    def __lnwordpatt__(self):
+        self.lnkdata = []
+        self.lnkdata_pos=[]
+        # Take one pattern-id at a time
+        for i in np.unique(self.patterns[:,0]):
+            # select the ith patterns
+            ith = self.patterns[self.patterns[:,0]==i,:]            
+            temp1 = []
+            temp1_pos=[]
+            temp_v=[]
+            # Take one timeline-instance at a time
+            for idx,j in enumerate(ith):
+                # get indices of words occuring within the range of the patterns.
+                # j+-0.5 is done to increase the pattern width by 1 sec
+                selected = np.where(np.logical_and(self.walign['stime']>=max(0.,j[1]-\
+                            0.25),self.walign['etime']<=min(np.max(\
+                            self.walign['etime']),j[2]+0.25)))[0]
+                if np.size(selected)==0:
+                    continue
+                # Use this selected region to extract all the words from the original
+                # transcript within this region, including the words
+                # that got skipped while forced alignments
+                orwordidx = [self.align2trmap[item] for item in selected.tolist() if\
+                    not self.align2trmap[item]==-1]
+                if not orwordidx:
+                    continue
+                # getting the word indices from the original transcript 
+                # within the pattern range
+                temp = [self.trans[item].strip().lower() for \
+                    item in range(min(orwordidx),max(orwordidx))+[max(orwordidx)]]
+                # Get POS
+                temp_pos = [ self.pos[item].strip().lower() for \
+                    item in range(min(orwordidx),max(orwordidx))+[max(orwordidx)]]
+                if not temp:
+                    continue
+                temp1.append([i]+temp)
+                temp1_pos.append([i]+temp_pos)
+
+            if temp1:
+                self.lnkdata.append(temp1)
+                self.lnkdata_pos.append(temp1_pos)
+
+    # This function creates a new global variable named "selected".
+    def __selectwalign__(self):
+        self.selected={}
+        # Take one pattern-id at a time
+        for i in np.unique(self.patterns[:,0]):
+            # select the ith patterns
+            ith = self.patterns[self.patterns[:,0]==i,:]
+            # Take one timeline-instance at a time. Idx is the index of time-instance
+            for idx,j in enumerate(ith):
+                # get indices of words occuring within the range of the patterns.
+                # j+-0.5 is done to increase the pattern width by 1 sec
+                temp = np.where(np.logical_and(self.walign['stime']>=max(0.,j[1]-\
+                            0.25),self.walign['etime']<=min(np.max(\
+                            self.walign['etime']),j[2]+0.25)))[0].tolist()
+                if temp:
+                    self.selected[(i,idx)] = temp                
 
 class AutoMannerPlus_mturk(AutoMannerPlus):
     '''
@@ -931,22 +972,67 @@ def thirdapproach():
     cp.dump({'X':X_data,'Y':Y_data,'featurename':amp.featurename()},\
         open('features_MT_gt.pkl','wb'))
 
+# This approach uses ALL possible features (for both participants and MTurk)
+def fourthapproach():
+    # Turker's ground truth
+    alignpath = '/Users/itanveer/Data/ROCSpeak_BL/features/alignments/'
+    timepath = '/Users/itanveer/Data/ROCSpeak_BL/Original_Data/Results_for_MTurk/'
+    gtfile = '/Users/itanveer/Data/ROCSpeak_BL/Ground-Truth/turkers_ratings.csv'
+    prosodypath = '/Users/itanveer/Data/ROCSpeak_BL/features/prosody/'
+    transpath = '/Users/itanveer/Data/ROCSpeak_BL/Ground-Truth/Transcripts/'
+    # Feature extraction with Mechanical Turk ground truth
+    amp_m = AutoMannerPlus_mturk(gtfile,alignpath,timepath,prosodypath)
+    amp = AutoMannerPlus_mturk(gtfile,alignpath,timepath,prosodypath)
+    # ===================== Participants ============================
+    # for all the files, extract features
+    X_data = ddict(list)
+    Y_data = ddict(list)
+    # File list can be found in gt dict
+    for avid in amp.gt.keys():
+        print 'processing ...',avid
+        amp.readEverything(transpath,avid)
+        features,gt_ = amp.extractAllFeatures()
+        # For every pattern
+        for i in features.keys():
+            X_data[avid].append(features[i])
+            Y_data[avid].append(gt_[i])
+    print 'Dump all data to all_features_MT_gt.pkl file'
+    cp.dump({'X':X_data,'Y':Y_data,'featurename':\
+        amp.featurename()},open('all_features_gt.pkl','wb'))
+    # ======================== MTURK ================================
+    # for all the files, extract features
+    X_data = ddict(list)
+    Y_data = ddict(list)
+    # File list can be found in gt dict
+    for avid in amp_m.gt.keys():
+        print 'processing ...',avid
+        amp_m.readEverything(transpath,avid)
+        features,gt_ = amp_m.extractAllFeatures()
+        # For every pattern
+        for i in features.keys():
+            X_data[avid].append(features[i])
+            Y_data[avid].append(gt_[i])
+    print 'Dump all data to all_features_MT_gt.pkl file'
+    cp.dump({'X':X_data,'Y':Y_data,'featurename':\
+        amp_m.featurename()},open('all_features_MT_gt.pkl','wb'))
+
 # Main
 if __name__=='__main__':
     # Generates the data file (Run for the first time)
     # ================================================
     #secondapproach()
-    thirdapproach()
+    #thirdapproach()
+    fourthapproach()
 
     # Uses the data file for classification
     # =====================================
     # Use the mechanical turk annotations
-    cls = classify('features_MT_gt.pkl')
-    cls.test_avg_corr(tot_iter=100,method='lasso')
-    cls.test_avg_corr(tot_iter=100,method='lda')
-    cls.test_avg_corr(tot_iter=100,method='svr')
-    # # Use the participants' self annotations
-    #cls = classify('features_gt.pkl')
-    #cls.test_avg_corr(tot_iter=100,method='lasso')    
-    #cls.test_avg_corr(tot_iter=100,method='lda')
-    #cls.test_avg_corr(tot_iter=100,method='svr')    
+    # cls = classify('all_features_MT_gt.pkl')
+    # cls.test_avg_corr(tot_iter=100,method='lasso')
+    # cls.test_avg_corr(tot_iter=100,method='lda')
+    # cls.test_avg_corr(tot_iter=100,method='svr')
+    # # # Use the participants' self annotations
+    # cls = classify('all_features_gt.pkl')
+    # cls.test_avg_corr(tot_iter=100,method='lasso')    
+    # cls.test_avg_corr(tot_iter=100,method='lda')
+    # cls.test_avg_corr(tot_iter=100,method='svr')    
