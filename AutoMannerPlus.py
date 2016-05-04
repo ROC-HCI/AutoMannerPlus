@@ -13,6 +13,7 @@ from LIWC_processor import *
 
 # Python lib
 import numpy as np
+from scipy.stats import expon
 import csv
 import cPickle as cp
 from collections import defaultdict as ddict
@@ -28,9 +29,11 @@ import matplotlib.cm as cm
 
 # ML related
 import sklearn as sk
+from sklearn.grid_search import *
 from sklearn import linear_model
 from sklearn.decomposition import PCA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
+
 
 class AutoMannerPlus(object):
     ''' 
@@ -732,10 +735,10 @@ class classify(object):
 
     # Test avg. correlation for multiple regressions
     def test_avg_corr(self,
+        show_all=False,
         method='lasso', # Method of classification
         task='regression', # Task can be regression or classification
         tot_iter = 30,  # Total number of repeated experiment
-        show_all=False
         ):
         if task=='regression':
             # Train and test the classifier many times for calculating the accuracy
@@ -747,18 +750,18 @@ class classify(object):
                 # One third of the data is reserved for testing
                 x_train,x_test,y_train,y_test = \
                     sk.cross_validation.train_test_split(\
-                    self.x,self.y,test_size=0.3,random_state=\
+                    self.x,self.y,test_size=0.5,random_state=\
                     int(time.time()*1000)%4294967295)
                 # Model Selection
                 if method=='lasso':
-                    model = linear_model.Lasso(alpha=0.05,\
+                    model = linear_model.Lasso(alpha=0.075,\
                         fit_intercept=True, \
                         normalize=False, precompute=False, copy_X=True, \
                         max_iter=1000000, tol=0.0001, warm_start=False, \
                         positive=False,selection='random')
                     # Training the model
                     model.fit(x_train,y_train)
-                    if self.disf and self.pros and self.body and self.face:
+                    if self.disf and self.pros and self.body and self.face and self.lex:
                         modelcoef = model.coef_
                         coefs.append(self.__coef_calc__(modelcoef))
                 elif method=='lda':
@@ -768,17 +771,16 @@ class classify(object):
                         shrinkage='auto')
                     # Training the model
                     model.fit(x_train,y_train)
-                    if self.disf and self.pros and self.body and self.face:
+                    if self.disf and self.pros and self.body and self.face and self.lex:
                         modelcoef = model.coef_
                         coefs.append(self.__coef_calc__(np.mean(\
                             np.abs(modelcoef),axis=0)))                
-                elif method=='svr':
+                elif method=='max-margin':
                     model = sk.svm.LinearSVR(
-                        C = 0.25,
-                        fit_intercept=True,random_state=\
+                        C = 0.01,fit_intercept=True,random_state=\
                         int(time.time()*1000)%4294967295)
                     model.fit(x_train,y_train)
-                    if self.disf and self.pros and self.body and self.face:
+                    if self.disf and self.pros and self.body and self.face and self.lex:
                         modelcoef = model.coef_
                         coefs.append(self.__coef_calc__(modelcoef))
                 # Prediction results
@@ -788,12 +790,60 @@ class classify(object):
                 correl.append(corr_val)
                 if show_all:
                     print 'Correlation:',corr_val
-        else:
-            raise NotImplementedError("Not implemented yet!")
+        elif task=='classification':
+            # Train and test the classifier many times for calculating the accuracy
+            correl = []
+            coefs = []
+            # Labels for classification
+            Y_ = 2.*(np.array(self.y)>3.0).astype(float)-1.
+
+
+            # Iterate for averaging the accuracy
+            for i in xrange(tot_iter):
+
+                # Half of the data is reserved as Evaluation set
+                x_train,x_test,y_train,y_test = \
+                    sk.cross_validation.train_test_split(\
+                    self.x,Y_,test_size=0.5,random_state=\
+                    int(time.time()*1000)%4294967295)  
+                param_grid = {'C':expon(loc=0.,scale=1.5)}
+                clf = RandomizedSearchCV(sk.svm.LinearSVC(penalty='l1',\
+                    dual=False,fit_intercept=True),param_grid,cv=5,\
+                    scoring='roc_auc',n_iter=50)
+                clf.fit(x_train,y_train)
+                print clf.best_params_['C']
+
+                if show_all:
+                    print 'iter:',i,
+                # Only max-margin for classification
+                if method=='max-margin':
+                    model = sk.svm.LinearSVC(C = clf.best_params_['C'],
+                        penalty='l1',dual=False,fit_intercept=True,
+                        random_state=int(time.time()*1000)%4294967295)
+                    model.fit(x_train,y_train)
+                    if self.disf and self.pros and self.body and self.face and self.lex:
+                        if model.coef_.ndim>1:
+                            modelcoef = model.coef_[0]
+                        coefs.append(self.__coef_calc__(modelcoef))
+                else:
+                    raise ValueError("Method "+method+" not supported yet")
+                # Prediction results
+                y_pred = model.predict(x_test)
+                y_score = model.decision_function(x_test)
+                # Calculate correlation with original
+                corr_val = sk.metrics.roc_auc_score(y_test,y_pred)
+                fpr,tpr,_ = sk.metrics.roc_curve(y_test,y_score)
+                correl.append(corr_val)
+                if show_all:
+                    print 'Accuracy:',corr_val
+                plt.figure('ROC')
+                plt.plot(fpr,tpr,label='ROC Curve')
+                plt.show()
 
         # Print feature proportions
         meancorrel = np.mean(correl)
         print '======================================'
+        print 'Task:',task,'Method:',method
         if task=='regression':
             print 'Average correlation:', meancorrel
         else:
@@ -818,8 +868,8 @@ class classify(object):
             print 'Face Percent:',coef[-2]
             print 'Lexical Percent:',coef[-1]
             print '--------------------------------'
-        
-        if len(np.shape(modelcoef))==2:
+
+        if modelcoef.ndim>1:
             modelcoef = modelcoef[0,:]
         # Print all the sorted coef values
         srIdx = np.argsort(-np.abs(modelcoef))
@@ -830,10 +880,12 @@ class classify(object):
         if self.disf and self.pros and self.body and self.face and self.lex:        
             # Visualize feature proportions
             plt.figure(self.filename)
-            plt.pie(coef[-5:],labels=['disfluency','prosody',\
-                'body_movements','face','lexical'])
+            plt.pie(coef[-5:],
+                labels=['disfluency','prosody','body_movements','face','lexical'],
+                colors = ['royalblue', 'darkkhaki', 'lightskyblue', 'lightcoral',
+                'yellowgreen'])
             plt.title('Average weight per feature. '\
-                + self.filename + ' mean coorelation ' + str(meancorrel))
+                + self.filename + ' mean score ' + str(meancorrel))
             plt.show()
     
     # Calculates the relative weights of the coefficients
@@ -1083,18 +1135,25 @@ if __name__=='__main__':
     # ================================================
     #secondapproach()
     #thirdapproach()
-    #fourthapproach()
+    fourthapproach()
 
     # Uses the data file for classification 
     # (Run if the data file is generated already)
     # =====================================
+    # ------------ Regression -------------
     # Use the mechanical turk annotations
     cls = classify('all_features_MT_gt.pkl')
     cls.test_avg_corr(tot_iter=1000,method='lasso')
     cls.test_avg_corr(tot_iter=1000,method='lda')
-    cls.test_avg_corr(tot_iter=1000,method='svr')
+    cls.test_avg_corr(tot_iter=1000,method='max-margin')
     # Use the participants' self annotations
     cls = classify('all_features_gt.pkl')
     cls.test_avg_corr(tot_iter=1000,method='lasso')    
     cls.test_avg_corr(tot_iter=1000,method='lda')
-    cls.test_avg_corr(tot_iter=1000,method='svr')    
+    cls.test_avg_corr(tot_iter=1000,method='max-margin')
+    # ------------ Classification -------------
+    # cls = classify('all_features_MT_gt.pkl')
+    # cls.test_avg_corr(method='max-margin',task='classification',tot_iter=10)
+    # # Use the participants' self annotations
+    # cls = classify('all_features_gt.pkl')
+    # cls.test_avg_corr(method='max-margin',task='classification',tot_iter=10)
