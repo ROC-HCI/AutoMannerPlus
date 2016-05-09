@@ -8,12 +8,12 @@ Created on Mon Mar 21 21:44:10 2016
 -------------------------------------------------------------------------------
 """
 # Local
-from Word2Vec import Word2Vec
 from LIWC_processor import *
-
+from krip_alpha import alpha, interval_metric
 # Python lib
 import numpy as np
 from scipy.stats import expon
+import scipy.signal as sg
 import csv
 import cPickle as cp
 from collections import defaultdict as ddict
@@ -624,8 +624,6 @@ class AutoMannerPlus(object):
                 else:
                     self.lnkdata[i] = temp1
                     self.lnkdata_pos[i] = temp1_pos
-                
-
 
     # This function creates a new global variable named "selected".
     def __selectwalign__(self):
@@ -648,301 +646,48 @@ class AutoMannerPlus_mturk(AutoMannerPlus):
     '''
     AMP_MT is a child of AutoMannerPlus. It assumes that the ground truth
     is being read from mechanical turk annotation file.
+    Set raw_gt to true if you want to get all the turker annotations
     '''
     def __readGT__(self,
         filename,
-        fieldname='This body movement pattern conveys a meaning.'
+        fieldname='This body movement pattern conveys a meaning.',
+        raw_gt=False
         ):
     # Most part of mechanical turk annotation is just same as participant
     # annotation, except the same video is annotated by multiple (3) turkers
         alldata = []
-        data_row = ddict(list)        
+        data_row = ddict(list)
+        data_row_mean = ddict(list)
         with open(filename,'r') as f:
             # Turker file doesn't have newline character
             gtfiledat = f.read().split('\r')
-            # reading the header and calculating column id (pid) for
-            # meaningfulness rating
-            header = gtfiledat[0].split(',')
-            pid = [idx for idx,item in enumerate(header) if item==fieldname]
-            # Reading actual data
-            for arow in gtfiledat[1:]:
-                # Skip the random part of the data
-                if 'random' in arow.lower():
-                    continue
-                rowdat = [item if i<3 else  float(item) if item \
-                    else 0. for i,item in enumerate(arow.strip().split(','))]
-                alldata.append(rowdat)
-            # Accumulating MTurk answers
-            for arow in alldata:
-                data_row[arow[2]].append(arow[3:])
-            # Averaging the mechanical turk answers
-            for item in data_row.keys():
-                data_row[item] = map(int,\
-                    np.round(np.mean(data_row[item],axis=0)).tolist())
-            # Make ground truth dict
-            self.gt = {item:[data_row[item][idx-3] for idx in pid]\
-             for item in data_row.keys()}
-
-class classify(object):
-    '''
-    A class to apply classifiers and obtain the accuracy and other metrics
-    
-    Class variables:
-    =============== 
-    x        : Features
-    y        : Labels
-    data     : All contents of the pkl file
-    totfeat  : Total number of features
-    featnames: Name of the features
-    '''
-    def __init__(self,pklfilename):
-        self.filename = pklfilename
-        data = cp.load(open(pklfilename,'rb'))
-        # Extract from data
-        self.X = [[float(item) for item in dat] for vid in data['X'].keys()\
-            for dat in data['X'][vid]]
-        self.y = [item for vid in data['Y'].keys() for item in data['Y'][vid]]
-        # Total number of features
-        self.totfeat = np.size(self.X,axis=1)
-        self.featnames = data['featurename']
-        # Use all features
-        self.usefeat()
-
-    # Turn on/off a specific group of features
-    def usefeat(self,disf=True,pros=True,body=True,face=True,lex=True):
-        self.disf=disf
-        self.pros=pros
-        self.body=body  
-        self.face=face
-        if self.totfeat==123:
-            self.lex=lex
-        # Standardize the features, x
-        self.x = self.X - np.mean(self.X,axis=0)
-        self.x = np.nan_to_num(self.x/np.std(self.x,axis=0))        
-        # Select the features according to the mask
-        x_ = np.empty(0).reshape(len(self.x),0)
-        if self.disf:
-            x_ = np.hstack((x_,self.x[:,:9]))
-        if self.pros:
-            x_ = np.hstack((x_,self.x[:,9:35]))
-        if self.body:
-            x_ = np.hstack((x_,self.x[:,35:76]))
-        if self.face:
-            x_ = np.hstack((x_,self.x[:,76:100]))
-        if self.lex:
-            x_ = np.hstack((x_,self.x[:,100:123]))
-        self.x = x_
-
-    # Test avg. correlation for multiple regressions
-    def test_avg_corr(self,
-        show_all=False,
-        method='lasso', # Method of classification
-        task='regression', # Task can be regression or classification
-        tot_iter = 30,  # Total number of repeated experiment
-        ):
-        if task=='regression':
-            # Train and test the classifier many times for calculating the accuracy
-            correl = []
-            coefs = []
-            for i in xrange(tot_iter):
-                if show_all:
-                    print 'iter:',i,
-                # One third of the data is reserved for testing
-                x_train,x_test,y_train,y_test = \
-                    sk.cross_validation.train_test_split(\
-                    self.x,self.y,test_size=0.5,random_state=\
-                    int(time.time()*1000)%4294967295)
-                # Model Selection
-                if method=='lasso':
-                    model = linear_model.Lasso(alpha=0.075,\
-                        fit_intercept=True, \
-                        normalize=False, precompute=False, copy_X=True, \
-                        max_iter=1000000, tol=0.0001, warm_start=False, \
-                        positive=False,selection='random')
-                    # Training the model
-                    model.fit(x_train,y_train)
-                    if self.disf and self.pros and self.body and self.face and self.lex:
-                        modelcoef = model.coef_
-                        coefs.append(self.__coef_calc__(modelcoef))
-                elif method=='lda':
-                    model = sk.discriminant_analysis.\
-                        LinearDiscriminantAnalysis(
-                        solver='lsqr',
-                        shrinkage='auto')
-                    # Training the model
-                    model.fit(x_train,y_train)
-                    if self.disf and self.pros and self.body and self.face and self.lex:
-                        modelcoef = model.coef_
-                        coefs.append(self.__coef_calc__(np.mean(\
-                            np.abs(modelcoef),axis=0)))                
-                elif method=='max-margin':
-                    model = sk.svm.LinearSVR(
-                        C = 0.01,fit_intercept=True,random_state=\
-                        int(time.time()*1000)%4294967295)
-                    model.fit(x_train,y_train)
-                    if self.disf and self.pros and self.body and self.face and self.lex:
-                        modelcoef = model.coef_
-                        coefs.append(self.__coef_calc__(modelcoef))
-                # Prediction results
-                y_pred = model.predict(x_test)
-                # Calculate correlation with original
-                corr_val = np.corrcoef(y_test,y_pred)[0,1]
-                correl.append(corr_val)
-                if show_all:
-                    print 'Correlation:',corr_val
-        elif task=='classification':
-            # Train and test the classifier many times for calculating the accuracy
-            correl = []
-            coefs = []
-            # Labels for classification
-            Y_ = 2.*(np.array(self.y)>3.0).astype(float)-1.
-
-
-            # Iterate for averaging the accuracy
-            for i in xrange(tot_iter):
-
-                # Half of the data is reserved as Evaluation set
-                x_train,x_test,y_train,y_test = \
-                    sk.cross_validation.train_test_split(\
-                    self.x,Y_,test_size=0.5,random_state=\
-                    int(time.time()*1000)%4294967295)  
-                param_grid = {'C':expon(loc=0.,scale=1.5)}
-                clf = RandomizedSearchCV(sk.svm.LinearSVC(penalty='l1',\
-                    dual=False,fit_intercept=True),param_grid,cv=5,\
-                    scoring='roc_auc',n_iter=50)
-                clf.fit(x_train,y_train)
-                print clf.best_params_['C']
-
-                if show_all:
-                    print 'iter:',i,
-                # Only max-margin for classification
-                if method=='max-margin':
-                    model = sk.svm.LinearSVC(C = clf.best_params_['C'],
-                        penalty='l1',dual=False,fit_intercept=True,
-                        random_state=int(time.time()*1000)%4294967295)
-                    model.fit(x_train,y_train)
-                    if self.disf and self.pros and self.body and self.face and self.lex:
-                        if model.coef_.ndim>1:
-                            modelcoef = model.coef_[0]
-                        coefs.append(self.__coef_calc__(modelcoef))
-                else:
-                    raise ValueError("Method "+method+" not supported yet")
-                # Prediction results
-                y_pred = model.predict(x_test)
-                y_score = model.decision_function(x_test)
-                # Calculate correlation with original
-                corr_val = sk.metrics.roc_auc_score(y_test,y_pred)
-                fpr,tpr,_ = sk.metrics.roc_curve(y_test,y_score)
-                correl.append(corr_val)
-                if show_all:
-                    print 'Accuracy:',corr_val
-                plt.figure('ROC')
-                plt.plot(fpr,tpr,label='ROC Curve')
-                plt.show()
-
-        # Print feature proportions
-        meancorrel = np.mean(correl)
-        print '======================================'
-        print 'Task:',task,'Method:',method
-        if task=='regression':
-            print 'Average correlation:', meancorrel
-        else:
-            print 'Average Accuracy:', meancorrel
-        print '======================================'
-        # Print grouped coefficient values
-        if self.disf and self.pros and self.body and self.face and self.lex:
-            coef = np.mean(coefs,axis=0)
-            print 'disf:', coef[0]
-            print 'pros:', coef[1]
-            print 'body:', coef[2]
-            print 'face:', coef[3]
-            print 'lexical:',coef[4]
-            print 'Number of disf feats:', coef[5]
-            print 'Number of pros feats:', coef[6]
-            print 'Number of body feats:', coef[7]
-            print 'Number of face feats:', coef[8]
-            print 'Number of lexical feats:', coef[9]
-            print 'disf percent:',coef[-5]
-            print 'prosody percent:',coef[-4]
-            print 'Body Percent:', coef[-3]
-            print 'Face Percent:',coef[-2]
-            print 'Lexical Percent:',coef[-1]
-            print '--------------------------------'
-
-        if modelcoef.ndim>1:
-            modelcoef = modelcoef[0,:]
-        # Print all the sorted coef values
-        srIdx = np.argsort(-np.abs(modelcoef))
-        for i in range(self.totfeat):
-            print self.featnames[srIdx[i]]+':',modelcoef[srIdx[i]]
-        print           
-        # Plot pie charts of the grouped coefficient values
-        if self.disf and self.pros and self.body and self.face and self.lex:        
-            # Visualize feature proportions
-            plt.figure(self.filename)
-            plt.pie(coef[-5:],
-                labels=['disfluency','prosody','body_movements','face','lexical'],
-                colors = ['royalblue', 'darkkhaki', 'lightskyblue', 'lightcoral',
-                'yellowgreen'])
-            plt.title('Average weight per feature. '\
-                + self.filename + ' mean score ' + str(meancorrel))
-            plt.show()
-    
-    # Calculates the relative weights of the coefficients
-    # 1. Total weights for disfluency, prosody and body features
-    # 2. Number of non-zeros for ... 
-    # 3. Weights per unit non-zero feature
-    # 4. Percent of feature categories
-    def __coef_calc__(self,coef):
-        disf = coef[:9]    # Disfluency features
-        pros = coef[9:35]  # Prosody features
-        body = coef[35:76] # Body features
-        face = coef[76:100]   # Face features
-        if self.lex:
-            lexic = coef[100:123] # lexical features
-
-        # Total weights
-        sum_disf = np.sum(np.abs(disf))
-        sum_pros = np.sum(np.abs(pros))
-        sum_body = np.sum(np.abs(body))
-        sum_face = np.sum(np.abs(face))
-        if self.lex:
-            sum_lexic = np.sum(np.abs(lexic))
-        # Number of features
-        count_disf = len(disf)
-        count_pros = len(pros)
-        count_body = len(body)
-        count_face = len(face)
-        if self.lex:
-            count_lexic = len(lexic)
-        # ratios
-        rat_disf = sum_disf/float(count_disf) if not count_disf==0 else 0.
-        rat_pros = sum_pros/float(count_pros) if not count_pros==0 else 0.
-        rat_body = sum_body/float(count_body) if not count_body==0 else 0.
-        rat_face = sum_face/float(count_face) if not count_face==0 else 0.
-        if not self.lex:
-            total_rat = rat_disf + rat_pros + rat_body + rat_face
-        else:
-            rat_lexic = sum_lexic/float(count_lexic) if not count_lexic==0 else 0.
-            total_rat = rat_disf + rat_pros + rat_body + rat_face + rat_lexic
-        # percents
-        perc_disf = rat_disf/total_rat * 100.
-        perc_pros = rat_pros/total_rat * 100.
-        perc_body = rat_body/total_rat * 100.
-        perc_face = rat_face/total_rat * 100.
-        if self.lex:
-            perc_lexic = rat_lexic/total_rat * 100.
-
-        if not self.lex:
-            return sum_disf,sum_pros,sum_body,sum_face,count_disf,\
-            count_pros,count_body,count_face,rat_disf,rat_pros,\
-            rat_body,rat_face,perc_disf,perc_pros,perc_body,perc_face
-        else:
-            return sum_disf,sum_pros,sum_body,sum_face,sum_lexic,count_disf,\
-            count_pros,count_body,count_face,count_lexic,rat_disf,rat_pros,\
-            rat_body,rat_face,rat_lexic,perc_disf,perc_pros,perc_body,\
-            perc_face,perc_lexic
-
+        # reading the header and calculating column id (pid) for
+        # meaningfulness rating
+        header = gtfiledat[0].split(',')
+        pid = [idx for idx,item in enumerate(header) if item==fieldname]
+        # Reading actual data
+        for arow in gtfiledat[1:]:
+            # Skip the random part of the data
+            if 'random' in arow.lower():
+                continue
+            rowdat = [item if i<3 else  float(item) if item \
+                else 0. for i,item in enumerate(arow.strip().split(','))]
+            alldata.append(rowdat)
+        # Accumulating MTurk answers
+        for arow in alldata:
+            data_row[arow[2]].append(arow[3:])
+        # Averaging the mechanical turk answers
+        for item in data_row.keys():
+            data_row_mean[item] = map(int,\
+                np.round(np.mean(data_row[item],axis=0)).tolist())
+        # Make ground truth dict
+        self.gt = {item:[data_row_mean[item][idx-3] for idx in pid]\
+         for item in data_row_mean.keys()}
+        # return original if necessary
+        self.__gt_full__ = {akey:np.array(data_row[akey])[:,np.array(pid)-3] \
+            for akey in data_row.keys()}
+        if raw_gt:
+            return self.__gt_full__
 
 class visualize(object):
     """
@@ -1032,6 +777,277 @@ class visualize(object):
         plt.legend()
         plt.show()
 
+
+class classify(object):
+    '''
+    A class to apply classifiers and obtain the accuracy and other metrics
+    
+    Class variables:
+    =============== 
+    x        : Features
+    y        : Labels
+    data     : All contents of the pkl file
+    totfeat  : Total number of features
+    featnames: Name of the features
+    '''
+    def __init__(self,pklfilename):
+        self.filename = pklfilename
+        data = cp.load(open(pklfilename,'rb'))
+        # Extract from data
+        self.X = [[float(item) for item in dat] for vid in data['X'].keys()\
+            for dat in data['X'][vid]]
+        self.y = [item for vid in data['Y'].keys() for item in data['Y'][vid]]
+        # Total number of features
+        self.totfeat = np.size(self.X,axis=1)
+        self.featnames = data['featurename']
+        # Use all features
+        self.usefeat()
+
+    # Turn on/off a specific group of features
+    def usefeat(self,disf=True,pros=True,body=True,face=True,lex=True):
+        self.disf=disf
+        self.pros=pros
+        self.body=body  
+        self.face=face
+        if self.totfeat==123:
+            self.lex=lex
+        # Standardize the features, x
+        self.x = self.X - np.mean(self.X,axis=0)
+        self.x = np.nan_to_num(self.x/np.std(self.x,axis=0))        
+        # Select the features according to the mask
+        x_ = np.empty(0).reshape(len(self.x),0)
+        if self.disf:
+            x_ = np.hstack((x_,self.x[:,:9]))
+        if self.pros:
+            x_ = np.hstack((x_,self.x[:,9:35]))
+        if self.body:
+            x_ = np.hstack((x_,self.x[:,35:76]))
+        if self.face:
+            x_ = np.hstack((x_,self.x[:,76:100]))
+        if self.lex:
+            x_ = np.hstack((x_,self.x[:,100:123]))
+        self.x = x_
+
+    # Test avg. correlation for multiple regressions
+    def test_avg_corr(self,
+        show_all=False,
+        method='lasso', # Method of classification
+        task='regression', # Task can be regression or classification
+        tot_iter = 30,  # Total number of repeated experiment
+        ):
+        if task=='regression':
+            # Train and test the classifier many times for calculating the accuracy
+            correl = []
+            coefs = []
+            for i in xrange(tot_iter):
+                if show_all:
+                    print 'iter:',i,
+                # One third of the data is reserved for testing
+                x_train,x_test,y_train,y_test = \
+                    sk.cross_validation.train_test_split(\
+                    self.x,self.y,test_size=0.3,random_state=\
+                    int(time.time()*1000)%4294967295)
+                # Model Selection
+                if method=='lasso':
+                    model = linear_model.Lasso(alpha=0.05,\
+                        fit_intercept=True, \
+                        normalize=False, precompute=False, copy_X=True, \
+                        max_iter=1000000, tol=0.0001, warm_start=False, \
+                        positive=False,selection='random')
+                    # Training the model
+                    model.fit(x_train,y_train)
+                    if self.disf and self.pros and self.body and self.face and self.lex:
+                        modelcoef = model.coef_
+                        coefs.append(self.__coef_calc__(modelcoef))
+                elif method=='lda':
+                    model = sk.discriminant_analysis.\
+                        LinearDiscriminantAnalysis(
+                        solver='lsqr',
+                        shrinkage='auto')
+                    # Training the model
+                    model.fit(x_train,y_train)
+                    if self.disf and self.pros and self.body and self.face and self.lex:
+                        modelcoef = model.coef_
+                        coefs.append(self.__coef_calc__(np.mean(\
+                            np.abs(modelcoef),axis=0)))                
+                elif method=='max-margin':
+                    model = sk.svm.LinearSVR(
+                        C = 0.01,fit_intercept=True,random_state=\
+                        int(time.time()*1000)%4294967295)
+                    model.fit(x_train,y_train)
+                    if self.disf and self.pros and self.body and self.face and self.lex:
+                        modelcoef = model.coef_
+                        coefs.append(self.__coef_calc__(modelcoef))
+                # Prediction results
+                y_pred = model.predict(x_test)
+                # Calculate correlation with original
+                corr_val = np.corrcoef(y_test,y_pred)[0,1]
+                correl.append(corr_val)
+                if show_all:
+                    print 'Correlation:',corr_val
+        elif task=='classification':
+            # Train and test the classifier many times for calculating the accuracy
+            correl = []
+            coefs = []
+            fpr = []
+            tpr = []
+            # Labels for classification
+            Y_ = 2.*(np.array(self.y)>4.0).astype(float)-1.
+
+
+            # Iterate for averaging the accuracy
+            for i in xrange(tot_iter):
+
+                # Half of the data is reserved as Evaluation set
+                x_train,x_test,y_train,y_test = \
+                    sk.cross_validation.train_test_split(\
+                    self.x,Y_,test_size=0.5,random_state=\
+                    int(time.time()*1000)%4294967295)  
+                param_grid = {'C':expon(loc=0.,scale=1)}
+                clf = RandomizedSearchCV(sk.svm.LinearSVC(penalty='l1',\
+                    dual=False,fit_intercept=True),param_grid,cv=5,\
+                    scoring='roc_auc',n_iter=50)
+                clf.fit(x_train,y_train)
+                print 'best param (C)',clf.best_params_['C']
+
+                if show_all:
+                    print 'iter:',i,
+                # Only max-margin for classification
+                if method=='max-margin':
+                    model = sk.svm.LinearSVC(C = clf.best_params_['C'],
+                        penalty='l1',dual=False,fit_intercept=True,
+                        random_state=int(time.time()*1000)%4294967295)
+                    model.fit(x_train,y_train)
+                    if self.disf and self.pros and self.body and self.face and self.lex:
+                        if model.coef_.ndim>1:
+                            modelcoef = model.coef_[0]
+                        coefs.append(self.__coef_calc__(modelcoef))
+                else:
+                    raise ValueError("Method "+method+" not supported yet")
+                # Prediction results
+                y_pred = model.predict(x_test)
+                y_score = model.decision_function(x_test)
+                # Calculate correlation with original
+                corr_val = sk.metrics.roc_auc_score(y_test,y_pred)
+                fpr_temp,tpr_temp,_ = sk.metrics.roc_curve(y_test,y_score)
+                
+                tpr.append(np.interp(np.linspace(0,1,100),fpr_temp,tpr_temp))
+                correl.append(corr_val)
+                if show_all:
+                    print 'Accuracy:',corr_val
+            plt.figure()
+            plt.plot(np.linspace(0,1,100),np.mean(tpr,axis=0),label='ROC Curve')
+            plt.xlabel('False Positive Rate')
+            plt.ylabel('True Positive Rate')
+            plt.savefig('Outputs/ROC_Curve_'+self.filename+'_'+\
+                method+'_'+task+'.pdf',format='pdf')
+
+        # Print feature proportions
+        meancorrel = np.mean(correl)
+        print '======================================'
+        print 'Task:',task,'Method:',method
+        if task=='regression':
+            print 'Average correlation:', meancorrel
+        else:
+            print 'Average Accuracy:', meancorrel
+        print '======================================'
+        # Print grouped coefficient values
+        if self.disf and self.pros and self.body and self.face and self.lex:
+            coef = np.mean(coefs,axis=0)
+            print 'disf:', coef[0]
+            print 'pros:', coef[1]
+            print 'body:', coef[2]
+            print 'face:', coef[3]
+            print 'lexical:',coef[4]
+            print 'Number of disf feats:', coef[5]
+            print 'Number of pros feats:', coef[6]
+            print 'Number of body feats:', coef[7]
+            print 'Number of face feats:', coef[8]
+            print 'Number of lexical feats:', coef[9]
+            print 'disf percent:',coef[-5]
+            print 'prosody percent:',coef[-4]
+            print 'Body Percent:', coef[-3]
+            print 'Face Percent:',coef[-2]
+            print 'Lexical Percent:',coef[-1]
+            print '--------------------------------'
+
+        if modelcoef.ndim>1:
+            modelcoef = modelcoef[0,:]
+        # Print all the sorted coef values
+        srIdx = np.argsort(-np.abs(modelcoef))
+        for i in range(self.totfeat):
+            print self.featnames[srIdx[i]]+':',modelcoef[srIdx[i]]
+        print           
+        # Plot pie charts of the grouped coefficient values
+        if self.disf and self.pros and self.body and self.face and self.lex:        
+            # Visualize feature proportions
+            plt.figure(figsize=(7,3))
+            plt.pie(coef[-5:],autopct='%1.1f%%',
+                labels=['disfluency','prosody','body_movements','face','lexical'],
+                colors = ['royalblue', 'darkkhaki', 'lightskyblue',\
+                 'lightcoral','yellowgreen'])
+            plt.axis('equal')
+            plt.subplots_adjust(top=0.75)
+            plt.title('Coefficient Ratio: '+task+'_'+method, y=1.10)
+            plt.savefig('Outputs/coef_ratio_'+self.filename+'_'+\
+                method+'_'+task+'%0.2f' % meancorrel+'.pdf',format='pdf')
+    
+    # Calculates the relative weights of the coefficients
+    # 1. Total weights for disfluency, prosody and body features
+    # 2. Number of non-zeros for ... 
+    # 3. Weights per unit non-zero feature
+    # 4. Percent of feature categories
+    def __coef_calc__(self,coef):
+        disf = coef[:9]    # Disfluency features
+        pros = coef[9:35]  # Prosody features
+        body = coef[35:76] # Body features
+        face = coef[76:100]   # Face features
+        if self.lex:
+            lexic = coef[100:123] # lexical features
+
+        # Total weights
+        sum_disf = np.sum(np.abs(disf))
+        sum_pros = np.sum(np.abs(pros))
+        sum_body = np.sum(np.abs(body))
+        sum_face = np.sum(np.abs(face))
+        if self.lex:
+            sum_lexic = np.sum(np.abs(lexic))
+        # Number of features
+        count_disf = len(disf)
+        count_pros = len(pros)
+        count_body = len(body)
+        count_face = len(face)
+        if self.lex:
+            count_lexic = len(lexic)
+        # ratios
+        rat_disf = sum_disf/float(count_disf) if not count_disf==0 else 0.
+        rat_pros = sum_pros/float(count_pros) if not count_pros==0 else 0.
+        rat_body = sum_body/float(count_body) if not count_body==0 else 0.
+        rat_face = sum_face/float(count_face) if not count_face==0 else 0.
+        if not self.lex:
+            total_rat = rat_disf + rat_pros + rat_body + rat_face
+        else:
+            rat_lexic = sum_lexic/float(count_lexic) if not count_lexic==0 else 0.
+            total_rat = rat_disf + rat_pros + rat_body + rat_face + rat_lexic
+        # percents
+        perc_disf = rat_disf/total_rat * 100.
+        perc_pros = rat_pros/total_rat * 100.
+        perc_body = rat_body/total_rat * 100.
+        perc_face = rat_face/total_rat * 100.
+        if self.lex:
+            perc_lexic = rat_lexic/total_rat * 100.
+
+        if not self.lex:
+            return sum_disf,sum_pros,sum_body,sum_face,count_disf,\
+            count_pros,count_body,count_face,rat_disf,rat_pros,\
+            rat_body,rat_face,perc_disf,perc_pros,perc_body,perc_face
+        else:
+            return sum_disf,sum_pros,sum_body,sum_face,sum_lexic,count_disf,\
+            count_pros,count_body,count_face,count_lexic,rat_disf,rat_pros,\
+            rat_body,rat_face,rat_lexic,perc_disf,perc_pros,perc_body,\
+            perc_face,perc_lexic
+
+
 # This approach uses the data from the participants' ratings
 def secondapproach():
     # Participants' ground truth
@@ -1111,6 +1127,7 @@ def fourthapproach():
     print 'Dump all data to all_features_gt.pkl file'
     cp.dump({'X':X_data,'Y':Y_data,'featurename':\
         amp.featurename()},open('all_features_gt.pkl','wb'))
+
     # ======================== MTURK ================================
     # for all the files, extract features
     amp_m = AutoMannerPlus_mturk(gtfile_turk,alignpath,timepath,prosodypath)
@@ -1127,7 +1144,158 @@ def fourthapproach():
             Y_data[avid].append(gt_[i])
     print 'Dump all data to all_features_MT_gt.pkl file'
     cp.dump({'X':X_data,'Y':Y_data,'featurename':\
-        amp_m.featurename()},open('all_features_MT_gt.pkl','wb'))
+        amp_m.featurename(),'GT_full':amp_m.__gt_full__},\
+        open('all_features_MT_gt.pkl','wb'))
+
+# Calculates the misc statistics
+def calc_misc_stat():
+    # Turker's ground truth
+    alignpath = '/Users/itanveer/Data/ROCSpeak_BL/features/alignments/'
+    timepath = '/Users/itanveer/Data/ROCSpeak_BL/Original_Data/Results_for_MTurk/'
+    gtfile_turk = '/Users/itanveer/Data/ROCSpeak_BL/Ground-Truth/turkers_ratings.csv'
+    gtfile = '/Users/itanveer/Data/ROCSpeak_BL/Ground-Truth/participants_ratings.csv'    
+    prosodypath = '/Users/itanveer/Data/ROCSpeak_BL/features/prosody/'
+    transpath = '/Users/itanveer/Data/ROCSpeak_BL/Ground-Truth/Transcripts/'    
+    # ===================== Participants ============================
+    amp = AutoMannerPlus(gtfile,alignpath,timepath,prosodypath)
+    vid = ['34.1','35.2','36.1','37.2','38.1','39.2','40.1','41.2','42.1',
+            '44.1','45.2','46.1','47.2','48.1','49.2','50.1','51.2','52.1',
+            '53.2','54.1','55.2','56.1','57.2','58.1','59.2','60.1','61.2',
+            '62.1']
+    amp_m = AutoMannerPlus_mturk(gtfile_turk,alignpath,timepath,prosodypath)
+    GT_Raw = amp_m.__readGT__(gtfile_turk,raw_gt=True)
+
+    # Inter-rater Agreements
+    data = np.zeros((3,0))    
+    for arate in GT_Raw.keys():
+        data = np.concatenate((data,GT_Raw[arate]),axis=1)
+    
+    ka1 = alpha(data,metric=interval_metric)
+    print 'Agreement among turkers',ka1
+
+    data = np.zeros((2,0))
+    for avid in vid:
+        temp = np.vstack((amp.gt[avid],GT_Raw[avid][0,:]))
+        data = np.concatenate((data,temp),axis=1)
+    ka2 = alpha(data,metric=interval_metric)
+    cor2 = np.corrcoef(data)[0,1]
+    print 'Agreement between first turker and participant',ka2,'corrcoef',cor2
+
+    data = np.zeros((2,0))
+    for avid in vid:
+        temp = np.vstack((amp.gt[avid],GT_Raw[avid][1,:]))
+        data = np.concatenate((data,temp),axis=1)
+    ka3 = alpha(data,metric=interval_metric)
+    cor3 = np.corrcoef(data)[0,1]
+    print 'Agreement between second turker and participant',ka3,'corrcoef',cor3
+
+    data = np.zeros((2,0))
+    for avid in vid:
+        temp = np.vstack((amp.gt[avid],GT_Raw[avid][2,:]))
+        data = np.concatenate((data,temp),axis=1)
+    ka4 = alpha(data,metric=interval_metric)
+    cor4 = np.corrcoef(data)[0,1]
+    print 'Agreement between third turker and participant',ka4,'corrcoef',cor4
+
+    data = np.zeros((2,0))
+    for avid in vid:
+        temp = np.vstack((amp.gt[avid],np.mean(GT_Raw[avid],axis=0)))
+        data = np.concatenate((data,temp),axis=1)
+    ka5 = alpha(data,metric=interval_metric)
+    cor5 = np.corrcoef(data)[0,1]
+    print 'Agreement between mean-turker and participant',ka5,'corrcoef',cor5
+
+    # Draw alpha
+    opacity = 0.5
+    fig = plt.figure('Agreements')
+    plt.bar([1,2,3,4,5],[ka1,ka2,ka3,ka4,ka5],0.3,alpha=opacity,\
+        color = 'b',label='Krippendorrf\'s Alpha')
+    plt.bar([2.3,3.3,4.3,5.3],[cor2,cor3,cor4,cor5],0.3,\
+        alpha=opacity,color = 'r',label='Correlation Coefficient')
+    plt.xticks([1,2,3,4,5],['Among Turkers', 'Turker-1 vs Participant',\
+        'Turker-2 vs Participant','Turker-3 vs Participant',\
+        'Turker-Average vs Participant'],rotation=40)
+    plt.text(1,ka1+0.01,'%0.2f'%ka1)
+    plt.text(2,ka2+0.01,'%0.2f'%ka2)
+    plt.text(3,ka3+0.01,'%0.2f'%ka3)
+    plt.text(4,ka4+0.01,'%0.2f'%ka4)
+    plt.text(5,ka5+0.01,'%0.2f'%ka5)
+    plt.text(2.3,cor2+0.01,'%0.2f'%cor2)
+    plt.text(3.3,cor3+0.01,'%0.2f'%cor3)
+    plt.text(4.3,cor4+0.01,'%0.2f'%cor4)
+    plt.text(5.3,cor5+0.01,'%0.2f'%cor5)
+    plt.ylim([0,0.65])
+    plt.ylabel('Agreement Scores')
+    plt.xlabel('Various Different Cases')
+    plt.subplots_adjust(bottom=0.4)
+    plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
+           ncol=2, mode="expand", borderaxespad=0.)
+    plt.savefig('Outputs/agreements.pdf',format='pdf')
+
+    # Draw corrcoef
+    # opacity = 0.5
+    # fig = plt.figure('agreements-corrcoef')
+    # plt.bar([1,2,3,4],[cor2,cor3,cor4,cor5],alpha=opacity,color = 'b')
+    # plt.xticks([1,2,3,4],['Turker-1 vs Participant',\
+    #     'Turker-2 vs Participant','Turker-3 vs Participant',\
+    #     'Turker-Average vs Participant'],rotation=40)
+    # plt.text(1.2,cor2+0.01,'%0.3f'%cor2)
+    # plt.text(2.2,cor3+0.01,'%0.3f'%cor3)
+    # plt.text(3.2,cor4+0.01,'%0.3f'%cor4)
+    # plt.text(4.2,cor5+0.01,'%0.3f'%cor5)
+    # plt.ylabel('Inter-Rater Agreements (Correlation Coefficient)')
+    # plt.xlabel('Various Different Cases')
+    # plt.subplots_adjust(bottom=0.32)
+    # plt.savefig('Outputs/agreements-corrcoef.pdf',format='pdf')
+
+    # Mechanical Turk Average Rating Distribution
+    bin_mean = count_ratings(amp_m.gt)
+    # Mechanical Turk First Annotator Rating Distribution
+    bin_first = count_ratings({key:val[0,:].tolist() for key,val in GT_Raw.items()})
+    # Mechanical Turk Second Annotator Rating Distribution
+    bin_second = count_ratings({key:val[1,:].tolist() for key,val in GT_Raw.items()})
+    # Mechanical Turk Third Annotator Rating Distribution
+    bin_third = count_ratings({key:val[2,:].tolist() for key,val in GT_Raw.items()})
+    # Participants Rating Distribution
+    bin_part = count_ratings(amp.gt)
+
+    # Draw relative distribution of labels
+    idx = np.arange(1,8)
+    bar_width = 1./6.
+    opacity = 0.5
+    plt.figure('Label Distribution',figsize=(10,6))
+    plt.bar(idx+bar_width,bin_first,bar_width,alpha=opacity,\
+        color='b',label='First Turker Annotation')
+    plt.bar(idx+2*bar_width,bin_second,bar_width,alpha=opacity,\
+        color='r',label='Second Turker Annotation')
+    plt.bar(idx+3*bar_width,bin_third,bar_width,alpha=opacity,\
+        color='g',label='Third Turker Annotation')
+    plt.bar(idx+4*bar_width,bin_mean,bar_width,alpha=opacity,\
+        color='k',label='Mean Turker Annotation')
+    plt.bar(idx+5*bar_width,bin_part,bar_width,alpha=opacity,\
+        color='darkkhaki',label='Participant\'s Annotation')
+    plt.xlabel('Ratings')
+    plt.ylabel('Label Counts')
+    plt.xticks(idx+3.5*bar_width,('1','2','3','4','5','6','7'))
+    plt.legend()
+    plt.savefig('Outputs/label_dist.pdf',format='pdf')
+
+
+
+# Count the distributions of the annotations
+def count_ratings(GT):
+    dist_counts = {}
+    for avid in GT.keys():
+        for arate in GT[avid]:
+            if arate==0:
+                continue
+            if not arate in dist_counts.keys():                
+                dist_counts[arate] = 0
+            else:
+                dist_counts[arate] += 1
+    # Return the distribution
+    return [dist_counts[akey] if akey in dist_counts.keys() \
+        else 0 for akey in range(1,8)]
 
 # Main
 if __name__=='__main__':
@@ -1136,24 +1304,26 @@ if __name__=='__main__':
     #secondapproach()
     #thirdapproach()
     fourthapproach()
+    # calc_misc_stat()
 
-    # Uses the data file for classification 
-    # (Run if the data file is generated already)
-    # =====================================
-    # ------------ Regression -------------
-    # Use the mechanical turk annotations
-    cls = classify('all_features_MT_gt.pkl')
-    cls.test_avg_corr(tot_iter=1000,method='lasso')
-    cls.test_avg_corr(tot_iter=1000,method='lda')
-    cls.test_avg_corr(tot_iter=1000,method='max-margin')
-    # Use the participants' self annotations
-    cls = classify('all_features_gt.pkl')
-    cls.test_avg_corr(tot_iter=1000,method='lasso')    
-    cls.test_avg_corr(tot_iter=1000,method='lda')
-    cls.test_avg_corr(tot_iter=1000,method='max-margin')
-    # ------------ Classification -------------
+    # # Uses the data file for classification 
+    # # (Run if the data file is generated already)
+    # # =====================================
+    # # ------------ Regression -------------
+    # # Use the mechanical turk annotations
+    # cls = classify('all_features_MT_gt.pkl')
+    # cls.test_avg_corr(tot_iter=1000,method='lasso')
+    # cls.test_avg_corr(tot_iter=1000,method='lda')
+    # cls.test_avg_corr(tot_iter=1000,method='max-margin')
+    # # Use the participants' self annotations
+    # cls = classify('all_features_gt.pkl')
+    # cls.test_avg_corr(tot_iter=1000,method='lasso')    
+    # cls.test_avg_corr(tot_iter=1000,method='lda')
+    # cls.test_avg_corr(tot_iter=1000,method='max-margin')
+    # # # ------------ Classification -------------
     # cls = classify('all_features_MT_gt.pkl')
     # cls.test_avg_corr(method='max-margin',task='classification',tot_iter=10)
     # # Use the participants' self annotations
     # cls = classify('all_features_gt.pkl')
     # cls.test_avg_corr(method='max-margin',task='classification',tot_iter=10)
+    # plt.show()
