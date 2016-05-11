@@ -1328,22 +1328,23 @@ if __name__=='__main__':
     #secondapproach()
     #thirdapproach()
     #fourthapproach()
-    # calc_misc_stat()
 
     # Uses the data file for classification 
     # (Run if the data file is generated already)
     # =====================================
+    # Misc Stats
+    calc_misc_stat()
     # ------------ Regression -------------
     # Use the mechanical turk annotations
-    # cls = classify('all_features_MT_gt.pkl')
-    # cls.test_avg_corr(tot_iter=1000,method='lasso')
-    # cls.test_avg_corr(tot_iter=1000,method='lda')
-    # cls.test_avg_corr(tot_iter=1000,method='max-margin')
-    # # Use the participants' self annotations
-    # cls = classify('all_features_gt.pkl')
-    # cls.test_avg_corr(tot_iter=1000,method='lasso')    
-    # cls.test_avg_corr(tot_iter=1000,method='lda')
-    # cls.test_avg_corr(tot_iter=1000,method='max-margin')
+    cls = classify('all_features_MT_gt.pkl')
+    cls.test_avg_corr(tot_iter=1000,method='lasso')
+    cls.test_avg_corr(tot_iter=1000,method='lda')
+    cls.test_avg_corr(tot_iter=1000,method='max-margin')
+    # Use the participants' self annotations
+    cls = classify('all_features_gt.pkl')
+    cls.test_avg_corr(tot_iter=1000,method='lasso')    
+    cls.test_avg_corr(tot_iter=1000,method='lda')
+    cls.test_avg_corr(tot_iter=1000,method='max-margin')
     # ------------ Classification -------------
     cls = classify('all_features_MT_gt.pkl')
     cls.test_avg_corr(method='max-margin',task='classification',tot_iter=10)
