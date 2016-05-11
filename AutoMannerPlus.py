@@ -804,6 +804,7 @@ class classify(object):
         self.usefeat()
 
     # Turn on/off a specific group of features
+    # and standardize the features
     def usefeat(self,disf=True,pros=True,body=True,face=True,lex=True):
         self.disf=disf
         self.pros=pros
@@ -812,8 +813,8 @@ class classify(object):
         if self.totfeat==123:
             self.lex=lex
         # Standardize the features, x
-        self.x = self.X - np.mean(self.X,axis=0)
-        self.x = np.nan_to_num(self.x/np.std(self.x,axis=0))        
+        self.x = np.nan_to_num(self.X/np.std(self.X,axis=0))
+        self.x = self.x - np.mean(self.x,axis=0)
         # Select the features according to the mask
         x_ = np.empty(0).reshape(len(self.x),0)
         if self.disf:
@@ -834,6 +835,7 @@ class classify(object):
         method='lasso', # Method of classification
         task='regression', # Task can be regression or classification
         tot_iter = 30,  # Total number of repeated experiment
+        paramtuning=True
         ):
         if task=='regression':
             # Train and test the classifier many times for calculating the accuracy
@@ -892,38 +894,60 @@ class classify(object):
             fpr = []
             tpr = []
             # Labels for classification
-            Y_ = 2.*(np.array(self.y)>4.0).astype(float)-1.
+            Y_ = 2.*(np.array(self.y)>3.0).astype(float)-1.
 
 
             # Iterate for averaging the accuracy
             for i in xrange(tot_iter):
+                if paramtuning:
+                    # Half of the data is reserved as Evaluation set
+                    x_train,x_test,y_train,y_test = \
+                        sk.cross_validation.train_test_split(\
+                        self.x,Y_,test_size=0.5,random_state=\
+                        int(time.time()*1000)%4294967295)  
+                    param_grid = {'C':expon(loc=0.,scale=3)}
+                    clf = RandomizedSearchCV(sk.svm.LinearSVC(penalty='l1',\
+                        dual=False,fit_intercept=True),param_grid,cv=5,\
+                        scoring='roc_auc',n_iter=50)
+                    clf.fit(x_train,y_train)
+                    print 'best param (C)',clf.best_params_['C']
 
-                # Half of the data is reserved as Evaluation set
-                x_train,x_test,y_train,y_test = \
-                    sk.cross_validation.train_test_split(\
-                    self.x,Y_,test_size=0.5,random_state=\
-                    int(time.time()*1000)%4294967295)  
-                param_grid = {'C':expon(loc=0.,scale=1)}
-                clf = RandomizedSearchCV(sk.svm.LinearSVC(penalty='l1',\
-                    dual=False,fit_intercept=True),param_grid,cv=5,\
-                    scoring='roc_auc',n_iter=50)
-                clf.fit(x_train,y_train)
-                print 'best param (C)',clf.best_params_['C']
-
-                if show_all:
-                    print 'iter:',i,
-                # Only max-margin for classification
-                if method=='max-margin':
-                    model = sk.svm.LinearSVC(C = clf.best_params_['C'],
-                        penalty='l1',dual=False,fit_intercept=True,
-                        random_state=int(time.time()*1000)%4294967295)
-                    model.fit(x_train,y_train)
-                    if self.disf and self.pros and self.body and self.face and self.lex:
-                        if model.coef_.ndim>1:
-                            modelcoef = model.coef_[0]
-                        coefs.append(self.__coef_calc__(modelcoef))
+                    if show_all:
+                        print 'iter:',i,
+                    # Only max-margin for classification
+                    if method=='max-margin':
+                        model = sk.svm.LinearSVC(C = clf.best_params_['C'],
+                            penalty='l1',dual=False,fit_intercept=True,
+                            random_state=int(time.time()*1000)%4294967295)
+                        model.fit(x_train,y_train)
+                        if self.disf and self.pros and self.body and self.face and self.lex:
+                            if model.coef_.ndim>1:
+                                modelcoef = model.coef_[0]
+                            coefs.append(self.__coef_calc__(modelcoef))
+                    else:
+                        raise ValueError("Method "+method+" not supported yet")
                 else:
-                    raise ValueError("Method "+method+" not supported yet")
+                    # Train test split
+                    x_train,x_test,y_train,y_test = \
+                        sk.cross_validation.train_test_split(\
+                        self.x,Y_,test_size=0.4,random_state=\
+                        int(time.time()*1000)%4294967295)  
+                    if show_all:
+                        print 'iter:',i,
+                    # Only max-margin for classification
+                    if method=='max-margin':
+                        model = sk.svm.LinearSVC(C = 0.05,
+                            penalty='l1',dual=False,fit_intercept=True,
+                            random_state=int(time.time()*1000)%4294967295)
+                        model.fit(x_train,y_train)
+                        if self.disf and self.pros and self.body and \
+                            self.face and self.lex:
+                            if model.coef_.ndim>1:
+                                modelcoef = model.coef_[0]
+                            coefs.append(self.__coef_calc__(modelcoef))
+                    else:
+                        raise ValueError("Method "+method+" not supported yet")
+
                 # Prediction results
                 y_pred = model.predict(x_test)
                 y_score = model.decision_function(x_test)
@@ -1303,14 +1327,14 @@ if __name__=='__main__':
     # ================================================
     #secondapproach()
     #thirdapproach()
-    fourthapproach()
+    #fourthapproach()
     # calc_misc_stat()
 
-    # # Uses the data file for classification 
-    # # (Run if the data file is generated already)
-    # # =====================================
-    # # ------------ Regression -------------
-    # # Use the mechanical turk annotations
+    # Uses the data file for classification 
+    # (Run if the data file is generated already)
+    # =====================================
+    # ------------ Regression -------------
+    # Use the mechanical turk annotations
     # cls = classify('all_features_MT_gt.pkl')
     # cls.test_avg_corr(tot_iter=1000,method='lasso')
     # cls.test_avg_corr(tot_iter=1000,method='lda')
@@ -1320,10 +1344,10 @@ if __name__=='__main__':
     # cls.test_avg_corr(tot_iter=1000,method='lasso')    
     # cls.test_avg_corr(tot_iter=1000,method='lda')
     # cls.test_avg_corr(tot_iter=1000,method='max-margin')
-    # # # ------------ Classification -------------
-    # cls = classify('all_features_MT_gt.pkl')
-    # cls.test_avg_corr(method='max-margin',task='classification',tot_iter=10)
-    # # Use the participants' self annotations
-    # cls = classify('all_features_gt.pkl')
-    # cls.test_avg_corr(method='max-margin',task='classification',tot_iter=10)
-    # plt.show()
+    # ------------ Classification -------------
+    cls = classify('all_features_MT_gt.pkl')
+    cls.test_avg_corr(method='max-margin',task='classification',tot_iter=10)
+    # Use the participants' self annotations
+    cls = classify('all_features_gt.pkl')
+    cls.test_avg_corr(method='max-margin',task='classification',tot_iter=10)
+    plt.show()
