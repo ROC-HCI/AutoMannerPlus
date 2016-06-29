@@ -1,8 +1,11 @@
-
-__all__ = ['match','ReadLIWCDictionary','ReadLIWCCategories']
-
-###########################################################################
-
+"""
+Created on Tue Jun 28 3:19:10 2016
+-------------------------------------------------------------------------------
+    Coded by Md. Iftekhar Tanveer (itanveer@cs.rochester.edu)
+    Rochester Human-Computer Interaction (ROCHCI)
+    University of Rochester
+-------------------------------------------------------------------------------
+"""
 
 def match(LIWCDic, word):
     if word in LIWCDic:
@@ -17,6 +20,7 @@ def match(LIWCDic, word):
 
 
 def ReadLIWCDictionary(path):
+
     f = open(path)
     lines = f.readlines()
     f.close()

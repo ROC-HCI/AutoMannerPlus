@@ -1,3 +1,4 @@
+
 # -*- coding: utf-8 -*-
 """
 Created on Mon Mar 21 21:44:10 2016
@@ -8,36 +9,24 @@ Created on Mon Mar 21 21:44:10 2016
 -------------------------------------------------------------------------------
 """
 # Local
-from LIWC_processor import *
-from krip_alpha import alpha, interval_metric
+from LIWC_processor import match, ReadLIWCDictionary, ReadLIWCCategories
+
 # Python lib
 import numpy as np
-from scipy.stats import expon
-import scipy.signal as sg
 import csv
-import cPickle as cp
 from collections import defaultdict as ddict
 from scipy.signal import resample
-import time
+import os
 
 # NLP
 import nltk
 
-# Plot related
-import matplotlib.pyplot as plt
-import matplotlib.cm as cm
-
-# ML related
-import sklearn as sk
-from sklearn.grid_search import *
-from sklearn import linear_model
-from sklearn.decomposition import PCA
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
-
-
-class AutoMannerPlus(object):
-    ''' 
+''' 
     A class extracting features for classifying gestures as mannerism or meaningful.
+    In order to extract the features, it aligns the transcript of the speech with the
+    original speech sound file. This alignment disregards some words in the transcript
+    as those are not there in the aligner's dictionary (so it doesn't know how to pronounce it)
+
     Class variables:
     =======================
     walign             : Numpy array of all the aligned words and their startime, endtime.
@@ -50,9 +39,11 @@ class AutoMannerPlus(object):
     pos                : A List of all the POS tags for the corresponding transcription words.
     align2trmap        : a dictionary from alignment word index (key) to transcription word (value)
                          index. If an alignment word is not found in trans list (e.g. sp) then the
-                         value is set to -1.
+                         value is set to -1. Note, this operation performs a dynamic programming based
+                         alignment operation which can become time-consuming
     gt                 : A dictionary from vidid (string) to the selected ground truth data.
-    patterns           : A numpy array of (sorted) pattern# and its start time and end time (in sec)
+    patterns           : A numpy array of (sorted) pattern# and its start time and end time (in sec).
+                       : It represents all the time locations where a specific pattern is occurred.
     vidid              : id (string) of the current video
     lnkdata            : A dictionary from pattern id to the words spoken within that pattern.
     lnkdata_pos        : Similar to lnkdata but contains POS
@@ -70,6 +61,7 @@ class AutoMannerPlus(object):
     categories         : A dictionary from LIWC category ID to category name
     featurenames       : A list of all the features (grows with additional file read)
 '''
+class AutoMannerPlus(object):
     # Provide the filenames: pattern-timeline file, aligned transcript file
     def __init__(self,
         gtfilename, # ground truth filename
@@ -87,8 +79,10 @@ class AutoMannerPlus(object):
         'so', 'ah', 'umhum', 'uhum', 'uhm','oh','oho','oooh','huh','ah','aha']
         self.liwc_categories = [2,4,5,8,10,11,16,17,18,20,21,22,126,127,128,129,130,131,\
             137,140,250,354,463,464]
-        self.LIWCDic = ReadLIWCDictionary('./liwcdic2007.dic')
-        self.categories = ReadLIWCCategories('./liwccat2007.txt')
+        path = os.path.abspath(__file__)
+        curdir = os.path.dirname(path)
+        self.LIWCDic = ReadLIWCDictionary(os.path.join(curdir,'data','liwcdic2007.dic'))
+        self.categories = ReadLIWCCategories(os.path.join(curdir,'data','liwccat2007.txt'))
         # Add feature names
         self.featurenames = ['Average time to speak word','Average time to speak filler word',\
             'Average pause length','Total number of words','Total number of filler words',\
@@ -233,8 +227,7 @@ class AutoMannerPlus(object):
     def extractAllFeatures(self):
         if not self.fullfeat:
             raise ValueError(\
-                "Can't extract all features unless everything is read.\
-                Use readEverything.")
+                "Can't extract all features unless everything is read. Use readEverything.")
         # It includes all the previous features
         featlist,gtlist = self.extractfeaturesfast()
         # Extract lexical features for each pattern
@@ -282,6 +275,7 @@ class AutoMannerPlus(object):
         self.vidid = vidid
         # Read the files
         self.__read_align__(self.alignpath+vidid+'.txt')
+        
         self.__read_time__(self.timepath+vidid+'/timeline_'+vidid+'.csv')
         self.__read_prosody__()
         self.__read__body_movements__()
@@ -588,7 +582,6 @@ class AutoMannerPlus(object):
             ith = self.patterns[self.patterns[:,0]==i,:]            
             temp1 = []
             temp1_pos=[]
-            temp_v=[]
             # Take one timeline-instance at a time
             for idx,j in enumerate(ith):
                 # get indices of words occuring within the range of the patterns.
@@ -642,19 +635,19 @@ class AutoMannerPlus(object):
                 if temp:
                     self.selected[(i,idx)] = temp                
 
+'''
+AMP_MT is a child of AutoMannerPlus. It assumes that the ground truth
+is being read from mechanical turk annotation file.
+Set raw_gt to true if you want to get all the turker annotations
+'''
 class AutoMannerPlus_mturk(AutoMannerPlus):
-    '''
-    AMP_MT is a child of AutoMannerPlus. It assumes that the ground truth
-    is being read from mechanical turk annotation file.
-    Set raw_gt to true if you want to get all the turker annotations
-    '''
     def __readGT__(self,
         filename,
         fieldname='This body movement pattern conveys a meaning.',
         raw_gt=False
         ):
-    # Most part of mechanical turk annotation is just same as participant
-    # annotation, except the same video is annotated by multiple (3) turkers
+        # Most part of mechanical turk annotation is just same as participant
+        # annotation, except the same video is annotated by multiple (3) turkers
         alldata = []
         data_row = ddict(list)
         data_row_mean = ddict(list)
@@ -688,667 +681,3 @@ class AutoMannerPlus_mturk(AutoMannerPlus):
             for akey in data_row.keys()}
         if raw_gt:
             return self.__gt_full__
-
-class visualize(object):
-    """
-    A class for visualizing the features with respect to ground truth.
-    It doesn't visualize the classification results.
-    """
-    def __init__(self, pklfilename = 'features_gt.pkl'):
-        self.data = cp.load(open(pklfilename,'rb'))
-        print 'visualizer loaded'
-    def printfeaturename(self):
-        for idx,feat in enumerate(self.data['featurename']):
-            print idx,'\t',feat
-        print '36 - end','\t','Body movement features'
-    def printvideonames(self):
-        for i, vidname in enumerate(np.sort(self.data['X'].keys())):
-            print i,':',vidname
-
-    # provide indices of two features and a videoid to plot wrt gt
-    def draw2features(self,featlist,vidid='all',interactive=True):
-        if not len(featlist)==2:
-            raise ValueError("featlist must contain indices of two features")
-        else:
-            if not vidid=='all':
-                x = [item[featlist[0]] for item in self.data['X'][vidid]]
-                y = [item[featlist[1]] for item in self.data['X'][vidid]]
-                gt = [item for item in self.data['Y'][vidid]]
-            else:
-                x = [item[featlist[0]] for vidid_ in self.data['X'].keys() \
-                    for item in self.data['X'][vidid_] ]
-                y = [item[featlist[1]] for vidid_ in self.data['X'].keys() \
-                    for item in self.data['X'][vidid_] ]
-                gt = [item for vidid_ in self.data['X'].keys() for item in \
-                    self.data['Y'][vidid_] ]
-            # Now plot the features
-            unq_gt = np.unique(gt)
-            colors = cm.cool(np.linspace(0, 1, len(unq_gt)))
-            if interactive:
-                plt.ion()
-            for idx, item in enumerate(unq_gt):
-                plt.scatter(np.array(x)[gt==item],np.array(y)[gt==item],\
-                    color=colors[idx], label=item)
-                plt.xlabel(self.data['featurename'][featlist[0]])
-                plt.ylabel(self.data['featurename'][featlist[1]])
-            plt.legend()
-            plt.show()
-
-    # Draw all the features in a 2D PCA space
-    def drawpca(self,interactive=True):
-        x = np.array([item for vidid_ in self.data['X'].keys() \
-            for item in self.data['X'][vidid_] ])
-        y = np.array([item for vidid_ in self.data['X'].keys() \
-            for item in self.data['Y'][vidid_] ])
-        pca = PCA(n_components=2)
-        x_project = pca.fit_transform(x)
-        # Now plot the features
-        if interactive:
-            plt.ion()
-        unq_y = np.unique(y)
-        colors = cm.cool(np.linspace(0, 1, len(unq_y)))
-        for idx, item in enumerate(unq_y):
-            plt.scatter(x_project[y==item,0],x_project[y==item,1],\
-                color=colors[idx], label=item)
-        plt.xlabel('First Principal Component')
-        plt.ylabel('Second Principal Component')
-        plt.legend()
-        plt.show()
-
-    # Draw all the features in a 2D LDA space
-    def drawlda(self,interactive=True):
-        x = np.array([item for vidid_ in self.data['X'].keys() \
-            for item in self.data['X'][vidid_] ])
-        y = np.array([item for vidid_ in self.data['X'].keys() \
-            for item in self.data['Y'][vidid_] ])
-        self.lda = LDA()
-        x_project=self.lda.fit_transform(x,y.tolist())
-
-        # Now plot the features
-        if interactive:
-            plt.ion()
-        unq_y = np.unique(y)
-        colors = cm.cool(np.linspace(0, 1, len(unq_y)))
-        for idx, item in enumerate(unq_y):
-            plt.scatter(x_project[y==item,0],x_project[y==item,1],\
-                color=colors[idx], label=item)
-        plt.xlabel('First LDA Component')
-        plt.ylabel('Second LDA Component')
-        plt.legend()
-        plt.show()
-
-
-class classify(object):
-    '''
-    A class to apply classifiers and obtain the accuracy and other metrics
-    
-    Class variables:
-    =============== 
-    x        : Features
-    y        : Labels
-    data     : All contents of the pkl file
-    totfeat  : Total number of features
-    featnames: Name of the features
-    '''
-    def __init__(self,pklfilename):
-        self.filename = pklfilename
-        data = cp.load(open(pklfilename,'rb'))
-        # Extract from data
-        self.X = [[float(item) for item in dat] for vid in data['X'].keys()\
-            for dat in data['X'][vid]]
-        self.y = [item for vid in data['Y'].keys() for item in data['Y'][vid]]
-        # Total number of features
-        self.totfeat = np.size(self.X,axis=1)
-        self.featnames = data['featurename']
-        # Use all features
-        self.usefeat()
-
-    # Turn on/off a specific group of features
-    # and standardize the features
-    def usefeat(self,disf=True,pros=True,body=True,face=True,lex=True):
-        self.disf=disf
-        self.pros=pros
-        self.body=body  
-        self.face=face
-        if self.totfeat==123:
-            self.lex=lex
-        # Standardize the features, x
-        self.x = np.nan_to_num(self.X/np.std(self.X,axis=0))
-        self.x = self.x - np.mean(self.x,axis=0)
-        # Select the features according to the mask
-        x_ = np.empty(0).reshape(len(self.x),0)
-        if self.disf:
-            x_ = np.hstack((x_,self.x[:,:9]))
-        if self.pros:
-            x_ = np.hstack((x_,self.x[:,9:35]))
-        if self.body:
-            x_ = np.hstack((x_,self.x[:,35:76]))
-        if self.face:
-            x_ = np.hstack((x_,self.x[:,76:100]))
-        if self.lex:
-            x_ = np.hstack((x_,self.x[:,100:123]))
-        self.x = x_
-
-    # Test avg. correlation for multiple regressions
-    def test_avg_corr(self,
-        show_all=False,
-        method='lasso', # Method of classification
-        task='regression', # Task can be regression or classification
-        tot_iter = 30,  # Total number of repeated experiment
-        paramtuning=True
-        ):
-        if task=='regression':
-            # Train and test the classifier many times for calculating the accuracy
-            correl = []
-            coefs = []
-            for i in xrange(tot_iter):
-                if show_all:
-                    print 'iter:',i,
-                # One third of the data is reserved for testing
-                x_train,x_test,y_train,y_test = \
-                    sk.cross_validation.train_test_split(\
-                    self.x,self.y,test_size=0.3,random_state=\
-                    int(time.time()*1000)%4294967295)
-                # Model Selection
-                if method=='lasso':
-                    model = linear_model.Lasso(alpha=0.05,\
-                        fit_intercept=True, \
-                        normalize=False, precompute=False, copy_X=True, \
-                        max_iter=1000000, tol=0.0001, warm_start=False, \
-                        positive=False,selection='random')
-                    # Training the model
-                    model.fit(x_train,y_train)
-                    if self.disf and self.pros and self.body and self.face and self.lex:
-                        modelcoef = model.coef_
-                        coefs.append(self.__coef_calc__(modelcoef))
-                elif method=='lda':
-                    model = sk.discriminant_analysis.\
-                        LinearDiscriminantAnalysis(
-                        solver='lsqr',
-                        shrinkage='auto')
-                    # Training the model
-                    model.fit(x_train,y_train)
-                    if self.disf and self.pros and self.body and self.face and self.lex:
-                        modelcoef = model.coef_
-                        coefs.append(self.__coef_calc__(np.mean(\
-                            np.abs(modelcoef),axis=0)))                
-                elif method=='max-margin':
-                    model = sk.svm.LinearSVR(
-                        C = 0.01,fit_intercept=True,random_state=\
-                        int(time.time()*1000)%4294967295)
-                    model.fit(x_train,y_train)
-                    if self.disf and self.pros and self.body and self.face and self.lex:
-                        modelcoef = model.coef_
-                        coefs.append(self.__coef_calc__(modelcoef))
-                # Prediction results
-                y_pred = model.predict(x_test)
-                # Calculate correlation with original
-                corr_val = np.corrcoef(y_test,y_pred)[0,1]
-                correl.append(corr_val)
-                if show_all:
-                    print 'Correlation:',corr_val
-        elif task=='classification':
-            # Train and test the classifier many times for calculating the accuracy
-            correl = []
-            coefs = []
-            fpr = []
-            tpr = []
-            # Labels for classification
-            Y_ = 2.*(np.array(self.y)>3.0).astype(float)-1.
-
-
-            # Iterate for averaging the accuracy
-            for i in xrange(tot_iter):
-                if paramtuning:
-                    # Half of the data is reserved as Evaluation set
-                    x_train,x_test,y_train,y_test = \
-                        sk.cross_validation.train_test_split(\
-                        self.x,Y_,test_size=0.5,random_state=\
-                        int(time.time()*1000)%4294967295)  
-                    param_grid = {'C':expon(loc=0.,scale=3)}
-                    clf = RandomizedSearchCV(sk.svm.LinearSVC(penalty='l1',\
-                        dual=False,fit_intercept=True),param_grid,cv=5,\
-                        scoring='roc_auc',n_iter=50)
-                    clf.fit(x_train,y_train)
-                    print 'best param (C)',clf.best_params_['C']
-
-                    if show_all:
-                        print 'iter:',i,
-                    # Only max-margin for classification
-                    if method=='max-margin':
-                        model = sk.svm.LinearSVC(C = clf.best_params_['C'],
-                            penalty='l1',dual=False,fit_intercept=True,
-                            random_state=int(time.time()*1000)%4294967295)
-                        model.fit(x_train,y_train)
-                        if self.disf and self.pros and self.body and self.face and self.lex:
-                            if model.coef_.ndim>1:
-                                modelcoef = model.coef_[0]
-                            coefs.append(self.__coef_calc__(modelcoef))
-                    else:
-                        raise ValueError("Method "+method+" not supported yet")
-                else:
-                    # Train test split
-                    x_train,x_test,y_train,y_test = \
-                        sk.cross_validation.train_test_split(\
-                        self.x,Y_,test_size=0.4,random_state=\
-                        int(time.time()*1000)%4294967295)  
-                    if show_all:
-                        print 'iter:',i,
-                    # Only max-margin for classification
-                    if method=='max-margin':
-                        model = sk.svm.LinearSVC(C = 0.05,
-                            penalty='l1',dual=False,fit_intercept=True,
-                            random_state=int(time.time()*1000)%4294967295)
-                        model.fit(x_train,y_train)
-                        if self.disf and self.pros and self.body and \
-                            self.face and self.lex:
-                            if model.coef_.ndim>1:
-                                modelcoef = model.coef_[0]
-                            coefs.append(self.__coef_calc__(modelcoef))
-                    else:
-                        raise ValueError("Method "+method+" not supported yet")
-
-                # Prediction results
-                y_pred = model.predict(x_test)
-                y_score = model.decision_function(x_test)
-                # Calculate correlation with original
-                corr_val = sk.metrics.roc_auc_score(y_test,y_pred)
-                fpr_temp,tpr_temp,_ = sk.metrics.roc_curve(y_test,y_score)
-                
-                tpr.append(np.interp(np.linspace(0,1,100),fpr_temp,tpr_temp))
-                correl.append(corr_val)
-                if show_all:
-                    print 'Accuracy:',corr_val
-            plt.figure()
-            plt.plot(np.linspace(0,1,100),np.mean(tpr,axis=0),label='ROC Curve')
-            plt.xlabel('False Positive Rate')
-            plt.ylabel('True Positive Rate')
-            plt.savefig('Outputs/ROC_Curve_'+self.filename+'_'+\
-                method+'_'+task+'.pdf',format='pdf')
-
-        # Print feature proportions
-        meancorrel = np.mean(correl)
-        print '======================================'
-        print 'Task:',task,'Method:',method
-        if task=='regression':
-            print 'Average correlation:', meancorrel
-        else:
-            print 'Average Accuracy:', meancorrel
-        print '======================================'
-        # Print grouped coefficient values
-        if self.disf and self.pros and self.body and self.face and self.lex:
-            coef = np.mean(coefs,axis=0)
-            print 'disf:', coef[0]
-            print 'pros:', coef[1]
-            print 'body:', coef[2]
-            print 'face:', coef[3]
-            print 'lexical:',coef[4]
-            print 'Number of disf feats:', coef[5]
-            print 'Number of pros feats:', coef[6]
-            print 'Number of body feats:', coef[7]
-            print 'Number of face feats:', coef[8]
-            print 'Number of lexical feats:', coef[9]
-            print 'disf percent:',coef[-5]
-            print 'prosody percent:',coef[-4]
-            print 'Body Percent:', coef[-3]
-            print 'Face Percent:',coef[-2]
-            print 'Lexical Percent:',coef[-1]
-            print '--------------------------------'
-
-        if modelcoef.ndim>1:
-            modelcoef = modelcoef[0,:]
-        # Print all the sorted coef values
-        srIdx = np.argsort(-np.abs(modelcoef))
-        for i in range(self.totfeat):
-            print self.featnames[srIdx[i]]+':',modelcoef[srIdx[i]]
-        print           
-        # Plot pie charts of the grouped coefficient values
-        if self.disf and self.pros and self.body and self.face and self.lex:        
-            # Visualize feature proportions
-            plt.figure(figsize=(7,3))
-            plt.pie(coef[-5:],autopct='%1.1f%%',
-                labels=['disfluency','prosody','body_movements','face','lexical'],
-                colors = ['royalblue', 'darkkhaki', 'lightskyblue',\
-                 'lightcoral','yellowgreen'])
-            plt.axis('equal')
-            plt.subplots_adjust(top=0.75)
-            plt.title('Coefficient Ratio: '+task+'_'+method, y=1.10)
-            plt.savefig('Outputs/coef_ratio_'+self.filename+'_'+\
-                method+'_'+task+'%0.2f' % meancorrel+'.pdf',format='pdf')
-    
-    # Calculates the relative weights of the coefficients
-    # 1. Total weights for disfluency, prosody and body features
-    # 2. Number of non-zeros for ... 
-    # 3. Weights per unit non-zero feature
-    # 4. Percent of feature categories
-    def __coef_calc__(self,coef):
-        disf = coef[:9]    # Disfluency features
-        pros = coef[9:35]  # Prosody features
-        body = coef[35:76] # Body features
-        face = coef[76:100]   # Face features
-        if self.lex:
-            lexic = coef[100:123] # lexical features
-
-        # Total weights
-        sum_disf = np.sum(np.abs(disf))
-        sum_pros = np.sum(np.abs(pros))
-        sum_body = np.sum(np.abs(body))
-        sum_face = np.sum(np.abs(face))
-        if self.lex:
-            sum_lexic = np.sum(np.abs(lexic))
-        # Number of features
-        count_disf = len(disf)
-        count_pros = len(pros)
-        count_body = len(body)
-        count_face = len(face)
-        if self.lex:
-            count_lexic = len(lexic)
-        # ratios
-        rat_disf = sum_disf/float(count_disf) if not count_disf==0 else 0.
-        rat_pros = sum_pros/float(count_pros) if not count_pros==0 else 0.
-        rat_body = sum_body/float(count_body) if not count_body==0 else 0.
-        rat_face = sum_face/float(count_face) if not count_face==0 else 0.
-        if not self.lex:
-            total_rat = rat_disf + rat_pros + rat_body + rat_face
-        else:
-            rat_lexic = sum_lexic/float(count_lexic) if not count_lexic==0 else 0.
-            total_rat = rat_disf + rat_pros + rat_body + rat_face + rat_lexic
-        # percents
-        perc_disf = rat_disf/total_rat * 100.
-        perc_pros = rat_pros/total_rat * 100.
-        perc_body = rat_body/total_rat * 100.
-        perc_face = rat_face/total_rat * 100.
-        if self.lex:
-            perc_lexic = rat_lexic/total_rat * 100.
-
-        if not self.lex:
-            return sum_disf,sum_pros,sum_body,sum_face,count_disf,\
-            count_pros,count_body,count_face,rat_disf,rat_pros,\
-            rat_body,rat_face,perc_disf,perc_pros,perc_body,perc_face
-        else:
-            return sum_disf,sum_pros,sum_body,sum_face,sum_lexic,count_disf,\
-            count_pros,count_body,count_face,count_lexic,rat_disf,rat_pros,\
-            rat_body,rat_face,rat_lexic,perc_disf,perc_pros,perc_body,\
-            perc_face,perc_lexic
-
-
-# This approach uses the data from the participants' ratings
-def secondapproach():
-    # Participants' ground truth
-    alignpath = '/Users/itanveer/Data/ROCSpeak_BL/features/alignments/'
-    timepath = '/Users/itanveer/Data/ROCSpeak_BL/Original_Data/Results/'
-    gtfile = '/Users/itanveer/Data/ROCSpeak_BL/Ground-Truth/participants_ratings.csv'
-    prosodypath = '/Users/itanveer/Data/ROCSpeak_BL/features/prosody/'
-    
-    amp = AutoMannerPlus(gtfile,alignpath,timepath,prosodypath)
-    vid = ['34.1','35.2','36.1','37.2','38.1','39.2','40.1','41.2','42.1',
-            '44.1','45.2','46.1','47.2','48.1','49.2','50.1','51.2','52.1',
-            '53.2','54.1','55.2','56.1','57.2','58.1','59.2','60.1','61.2',
-            '62.1']
-    X_data = ddict(list)
-    Y_data = ddict(list)
-    for avid in vid:
-        print 'processing ...',avid
-        amp.readfast(avid)
-        features,gt_ = amp.extractfeaturesfast()
-        for i in features.keys():
-            X_data[avid].append(features[i])
-            Y_data[avid].append(gt_[i])
-    print 'Dump all data to features_gt.pkl file'
-    cp.dump({'X':X_data,'Y':Y_data,'featurename':amp.featurename()},\
-        open('features_gt.pkl','wb'))
-
-# This approach uses the data from the mechanical turk annotations
-def thirdapproach():
-    # Turker's ground truth
-    alignpath = '/Users/itanveer/Data/ROCSpeak_BL/features/alignments/'
-    timepath = '/Users/itanveer/Data/ROCSpeak_BL/Original_Data/Results_for_MTurk/'
-    gtfile = '/Users/itanveer/Data/ROCSpeak_BL/Ground-Truth/turkers_ratings.csv'
-    prosodypath = '/Users/itanveer/Data/ROCSpeak_BL/features/prosody/'
-    amp = AutoMannerPlus_mturk(gtfile,alignpath,timepath,prosodypath)
-    
-    # for all the files, extract features
-    X_data = ddict(list)
-    Y_data = ddict(list)
-    # File list can be found in gt dict
-    for avid in amp.gt.keys():
-        print 'processing ...',avid
-        amp.readfast(avid)
-        features,gt_ = amp.extractfeaturesfast()
-        for i in features.keys():
-            X_data[avid].append(features[i])
-            Y_data[avid].append(gt_[i])
-    print 'Dump all data to features_MT_gt.pkl file'
-    cp.dump({'X':X_data,'Y':Y_data,'featurename':amp.featurename()},\
-        open('features_MT_gt.pkl','wb'))
-
-# This approach uses ALL possible features (for both participants and MTurk)
-def fourthapproach():
-    # Turker's ground truth
-    alignpath = '/Users/itanveer/Data/ROCSpeak_BL/features/alignments/'
-    timepath = '/Users/itanveer/Data/ROCSpeak_BL/Original_Data/Results_for_MTurk/'
-    gtfile_turk = '/Users/itanveer/Data/ROCSpeak_BL/Ground-Truth/turkers_ratings.csv'
-    gtfile = '/Users/itanveer/Data/ROCSpeak_BL/Ground-Truth/participants_ratings.csv'    
-    prosodypath = '/Users/itanveer/Data/ROCSpeak_BL/features/prosody/'
-    transpath = '/Users/itanveer/Data/ROCSpeak_BL/Ground-Truth/Transcripts/'
-
-    # ===================== Participants ============================
-    amp = AutoMannerPlus(gtfile,alignpath,timepath,prosodypath)
-    vid = ['34.1','35.2','36.1','37.2','38.1','39.2','40.1','41.2','42.1',
-            '44.1','45.2','46.1','47.2','48.1','49.2','50.1','51.2','52.1',
-            '53.2','54.1','55.2','56.1','57.2','58.1','59.2','60.1','61.2',
-            '62.1']
-    X_data = ddict(list)
-    Y_data = ddict(list)
-    for avid in vid:
-        print 'processing ...',avid
-        amp.readEverything(transpath,avid)
-        features,gt_ = amp.extractAllFeatures()
-        # For every pattern
-        for i in features.keys():
-            X_data[avid].append(features[i])
-            Y_data[avid].append(gt_[i])
-    print 'Dump all data to all_features_gt.pkl file'
-    cp.dump({'X':X_data,'Y':Y_data,'featurename':\
-        amp.featurename()},open('all_features_gt.pkl','wb'))
-
-    # ======================== MTURK ================================
-    # for all the files, extract features
-    amp_m = AutoMannerPlus_mturk(gtfile_turk,alignpath,timepath,prosodypath)
-    X_data = ddict(list)
-    Y_data = ddict(list)
-    # File list can be found in gt dict
-    for avid in amp_m.gt.keys():
-        print 'processing ...',avid
-        amp_m.readEverything(transpath,avid)
-        features,gt_ = amp_m.extractAllFeatures()
-        # For every pattern
-        for i in features.keys():
-            X_data[avid].append(features[i])
-            Y_data[avid].append(gt_[i])
-    print 'Dump all data to all_features_MT_gt.pkl file'
-    cp.dump({'X':X_data,'Y':Y_data,'featurename':\
-        amp_m.featurename(),'GT_full':amp_m.__gt_full__},\
-        open('all_features_MT_gt.pkl','wb'))
-
-# Calculates the misc statistics
-def calc_misc_stat():
-    # Turker's ground truth
-    alignpath = '/Users/itanveer/Data/ROCSpeak_BL/features/alignments/'
-    timepath = '/Users/itanveer/Data/ROCSpeak_BL/Original_Data/Results_for_MTurk/'
-    gtfile_turk = '/Users/itanveer/Data/ROCSpeak_BL/Ground-Truth/turkers_ratings.csv'
-    gtfile = '/Users/itanveer/Data/ROCSpeak_BL/Ground-Truth/participants_ratings.csv'    
-    prosodypath = '/Users/itanveer/Data/ROCSpeak_BL/features/prosody/'
-    transpath = '/Users/itanveer/Data/ROCSpeak_BL/Ground-Truth/Transcripts/'    
-    # ===================== Participants ============================
-    amp = AutoMannerPlus(gtfile,alignpath,timepath,prosodypath)
-    vid = ['34.1','35.2','36.1','37.2','38.1','39.2','40.1','41.2','42.1',
-            '44.1','45.2','46.1','47.2','48.1','49.2','50.1','51.2','52.1',
-            '53.2','54.1','55.2','56.1','57.2','58.1','59.2','60.1','61.2',
-            '62.1']
-    amp_m = AutoMannerPlus_mturk(gtfile_turk,alignpath,timepath,prosodypath)
-    GT_Raw = amp_m.__readGT__(gtfile_turk,raw_gt=True)
-
-    # Inter-rater Agreements
-    data = np.zeros((3,0))    
-    for arate in GT_Raw.keys():
-        data = np.concatenate((data,GT_Raw[arate]),axis=1)
-    
-    ka1 = alpha(data,metric=interval_metric)
-    print 'Agreement among turkers',ka1
-
-    data = np.zeros((2,0))
-    for avid in vid:
-        temp = np.vstack((amp.gt[avid],GT_Raw[avid][0,:]))
-        data = np.concatenate((data,temp),axis=1)
-    ka2 = alpha(data,metric=interval_metric)
-    cor2 = np.corrcoef(data)[0,1]
-    print 'Agreement between first turker and participant',ka2,'corrcoef',cor2
-
-    data = np.zeros((2,0))
-    for avid in vid:
-        temp = np.vstack((amp.gt[avid],GT_Raw[avid][1,:]))
-        data = np.concatenate((data,temp),axis=1)
-    ka3 = alpha(data,metric=interval_metric)
-    cor3 = np.corrcoef(data)[0,1]
-    print 'Agreement between second turker and participant',ka3,'corrcoef',cor3
-
-    data = np.zeros((2,0))
-    for avid in vid:
-        temp = np.vstack((amp.gt[avid],GT_Raw[avid][2,:]))
-        data = np.concatenate((data,temp),axis=1)
-    ka4 = alpha(data,metric=interval_metric)
-    cor4 = np.corrcoef(data)[0,1]
-    print 'Agreement between third turker and participant',ka4,'corrcoef',cor4
-
-    data = np.zeros((2,0))
-    for avid in vid:
-        temp = np.vstack((amp.gt[avid],np.mean(GT_Raw[avid],axis=0)))
-        data = np.concatenate((data,temp),axis=1)
-    ka5 = alpha(data,metric=interval_metric)
-    cor5 = np.corrcoef(data)[0,1]
-    print 'Agreement between mean-turker and participant',ka5,'corrcoef',cor5
-
-    # Draw alpha
-    opacity = 0.5
-    fig = plt.figure('Agreements')
-    plt.bar([1,2,3,4,5],[ka1,ka2,ka3,ka4,ka5],0.3,alpha=opacity,\
-        color = 'b',label='Krippendorrf\'s Alpha')
-    plt.bar([2.3,3.3,4.3,5.3],[cor2,cor3,cor4,cor5],0.3,\
-        alpha=opacity,color = 'r',label='Correlation Coefficient')
-    plt.xticks([1,2,3,4,5],['Among Turkers', 'Turker-1 vs Participant',\
-        'Turker-2 vs Participant','Turker-3 vs Participant',\
-        'Turker-Average vs Participant'],rotation=40)
-    plt.text(1,ka1+0.01,'%0.2f'%ka1)
-    plt.text(2,ka2+0.01,'%0.2f'%ka2)
-    plt.text(3,ka3+0.01,'%0.2f'%ka3)
-    plt.text(4,ka4+0.01,'%0.2f'%ka4)
-    plt.text(5,ka5+0.01,'%0.2f'%ka5)
-    plt.text(2.3,cor2+0.01,'%0.2f'%cor2)
-    plt.text(3.3,cor3+0.01,'%0.2f'%cor3)
-    plt.text(4.3,cor4+0.01,'%0.2f'%cor4)
-    plt.text(5.3,cor5+0.01,'%0.2f'%cor5)
-    plt.ylim([0,0.65])
-    plt.ylabel('Agreement Scores')
-    plt.xlabel('Various Different Cases')
-    plt.subplots_adjust(bottom=0.4)
-    plt.legend(bbox_to_anchor=(0., 1.02, 1., .102), loc=3,
-           ncol=2, mode="expand", borderaxespad=0.)
-    plt.savefig('Outputs/agreements.pdf',format='pdf')
-
-    # Draw corrcoef
-    # opacity = 0.5
-    # fig = plt.figure('agreements-corrcoef')
-    # plt.bar([1,2,3,4],[cor2,cor3,cor4,cor5],alpha=opacity,color = 'b')
-    # plt.xticks([1,2,3,4],['Turker-1 vs Participant',\
-    #     'Turker-2 vs Participant','Turker-3 vs Participant',\
-    #     'Turker-Average vs Participant'],rotation=40)
-    # plt.text(1.2,cor2+0.01,'%0.3f'%cor2)
-    # plt.text(2.2,cor3+0.01,'%0.3f'%cor3)
-    # plt.text(3.2,cor4+0.01,'%0.3f'%cor4)
-    # plt.text(4.2,cor5+0.01,'%0.3f'%cor5)
-    # plt.ylabel('Inter-Rater Agreements (Correlation Coefficient)')
-    # plt.xlabel('Various Different Cases')
-    # plt.subplots_adjust(bottom=0.32)
-    # plt.savefig('Outputs/agreements-corrcoef.pdf',format='pdf')
-
-    # Mechanical Turk Average Rating Distribution
-    bin_mean = count_ratings(amp_m.gt)
-    # Mechanical Turk First Annotator Rating Distribution
-    bin_first = count_ratings({key:val[0,:].tolist() for key,val in GT_Raw.items()})
-    # Mechanical Turk Second Annotator Rating Distribution
-    bin_second = count_ratings({key:val[1,:].tolist() for key,val in GT_Raw.items()})
-    # Mechanical Turk Third Annotator Rating Distribution
-    bin_third = count_ratings({key:val[2,:].tolist() for key,val in GT_Raw.items()})
-    # Participants Rating Distribution
-    bin_part = count_ratings(amp.gt)
-
-    # Draw relative distribution of labels
-    idx = np.arange(1,8)
-    bar_width = 1./6.
-    opacity = 0.5
-    plt.figure('Label Distribution',figsize=(10,6))
-    plt.bar(idx+bar_width,bin_first,bar_width,alpha=opacity,\
-        color='b',label='First Turker Annotation')
-    plt.bar(idx+2*bar_width,bin_second,bar_width,alpha=opacity,\
-        color='r',label='Second Turker Annotation')
-    plt.bar(idx+3*bar_width,bin_third,bar_width,alpha=opacity,\
-        color='g',label='Third Turker Annotation')
-    plt.bar(idx+4*bar_width,bin_mean,bar_width,alpha=opacity,\
-        color='k',label='Mean Turker Annotation')
-    plt.bar(idx+5*bar_width,bin_part,bar_width,alpha=opacity,\
-        color='darkkhaki',label='Participant\'s Annotation')
-    plt.xlabel('Ratings')
-    plt.ylabel('Label Counts')
-    plt.xticks(idx+3.5*bar_width,('1','2','3','4','5','6','7'))
-    plt.legend()
-    plt.savefig('Outputs/label_dist.pdf',format='pdf')
-
-
-
-# Count the distributions of the annotations
-def count_ratings(GT):
-    dist_counts = {}
-    for avid in GT.keys():
-        for arate in GT[avid]:
-            if arate==0:
-                continue
-            if not arate in dist_counts.keys():                
-                dist_counts[arate] = 0
-            else:
-                dist_counts[arate] += 1
-    # Return the distribution
-    return [dist_counts[akey] if akey in dist_counts.keys() \
-        else 0 for akey in range(1,8)]
-
-# Main
-if __name__=='__main__':
-    # Generates the data file (Run for the first time)
-    # ================================================
-    #secondapproach()
-    #thirdapproach()
-    #fourthapproach()
-
-    # Uses the data file for classification 
-    # (Run if the data file is generated already)
-    # =====================================
-    # Misc Stats
-    calc_misc_stat()
-    # ------------ Regression -------------
-    # Use the mechanical turk annotations
-    cls = classify('all_features_MT_gt.pkl')
-    cls.test_avg_corr(tot_iter=1000,method='lasso')
-    cls.test_avg_corr(tot_iter=1000,method='lda')
-    cls.test_avg_corr(tot_iter=1000,method='max-margin')
-    # Use the participants' self annotations
-    cls = classify('all_features_gt.pkl')
-    cls.test_avg_corr(tot_iter=1000,method='lasso')    
-    cls.test_avg_corr(tot_iter=1000,method='lda')
-    cls.test_avg_corr(tot_iter=1000,method='max-margin')
-    # ------------ Classification -------------
-    cls = classify('all_features_MT_gt.pkl')
-    cls.test_avg_corr(method='max-margin',task='classification',tot_iter=10)
-    # Use the participants' self annotations
-    cls = classify('all_features_gt.pkl')
-    cls.test_avg_corr(method='max-margin',task='classification',tot_iter=10)
-    plt.show()
