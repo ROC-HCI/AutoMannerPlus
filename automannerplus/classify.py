@@ -22,9 +22,8 @@ import sklearn as sk
 from sklearn.grid_search import *
 from sklearn import linear_model
 from sklearn.decomposition import PCA
+from sklearn.preprocessing import scale
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
-
-
 
 '''
 A class to apply classifiers and obtain the accuracy and other metrics
@@ -42,8 +41,9 @@ class Classify(object):
         self.filename = pklfilename
         data = cp.load(open(pklfilename,'rb'))
         # Extract from data
-        self.X = [[float(item) for item in dat] for vid in data['X'].keys()\
+        X_unscaled = [[float(item) for item in dat] for vid in data['X'].keys()\
             for dat in data['X'][vid]]
+        self.X = scale(X_unscaled)
         self.y = [item for vid in data['Y'].keys() for item in data['Y'][vid]]
         # Total number of features
         self.totfeat = np.size(self.X,axis=1)
