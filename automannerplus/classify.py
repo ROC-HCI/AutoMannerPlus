@@ -25,6 +25,7 @@ from sklearn.decomposition import PCA
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
 
 
+
 '''
 A class to apply classifiers and obtain the accuracy and other metrics
 
@@ -36,7 +37,7 @@ data     : All contents of the pkl file
 totfeat  : Total number of features
 featnames: Name of the features
 '''
-class classify(object):
+class Classify(object):
     def __init__(self,pklfilename):
         self.filename = pklfilename
         data = cp.load(open(pklfilename,'rb'))

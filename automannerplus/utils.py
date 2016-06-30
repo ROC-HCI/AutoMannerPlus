@@ -179,9 +179,11 @@ def save_for_classify(
         print 'processing ...',avid
         amp.readfast(avid)
         features,gt_ = amp.extractfeaturesfast()
+
         for i in features.keys():
             X_data[avid].append(features[i])
             Y_data[avid].append(gt_[i])
+
     print 'Dump all data to features_gt.pkl file'
     cp.dump({'X':X_data,'Y':Y_data,'featurename':amp.featurename()},open(outfilename,'wb'))
 

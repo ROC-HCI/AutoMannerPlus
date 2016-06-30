@@ -11,7 +11,7 @@ Created on Tue Jun 28 3:19:10 2016
 A class for visualizing the features with respect to ground truth.
 It doesn't visualize the classification results.
 """
-class visualize(object):
+class Visualize(object):
     def __init__(self, pklfilename = 'features_gt.pkl'):
         self.data = cp.load(open(pklfilename,'rb'))
         print 'visualizer loaded'

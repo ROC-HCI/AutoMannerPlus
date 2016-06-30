@@ -84,7 +84,7 @@ class AutoMannerPlus(object):
         self.LIWCDic = ReadLIWCDictionary(os.path.join(curdir,'data','liwcdic2007.dic'))
         self.categories = ReadLIWCCategories(os.path.join(curdir,'data','liwccat2007.txt'))
         # Add feature names
-        self.featurenames = ['Average time to speak word','Average time to speak filler word',\
+        self.basefeaturenames = ['Average time to speak word','Average time to speak filler word',\
             'Average pause length','Total number of words','Total number of filler words',\
             'Total number of pauses','% of word per instance','% of filler per instance',\
             '% of pause per instance','Mean loudness','Minimum loudness','Maximum loudness',\
@@ -111,7 +111,25 @@ class AutoMannerPlus(object):
 
     # A method to return the names of all the active features
     def featurename(self):
-        return self.featurenames      
+        accumulator=[]
+        accumulator.extend(self.basefeaturenames)
+        # Accumulate face feature name
+        try:
+            accumulator.extend(self.face_feat_name)
+        except AttributeError:
+            pass
+        # Accumulate body feature name
+        try:
+            accumulator.extend(self.body_feat_name)
+        except AttributeError:
+            pass
+        # Accumulate lexical feature name
+        try:
+            accumulator.extend(self.lexfeatname)
+        except AttributeError:
+            pass
+
+        return accumulator
         
     # Extract features from the aligned transcript data
     # Features extracted in this function are as follows (per instance):
@@ -235,8 +253,7 @@ class AutoMannerPlus(object):
             feat_ = self.__lexical_feature__(i)
             featlist[i].extend(feat_)
         # Append lexical feature names
-        featname = ['count_'+self.categories[item] for item in self.liwc_categories]
-        self.featurenames.extend(featname)
+        self.lexfeatname = ['count_'+self.categories[item] for item in self.liwc_categories]
         return featlist,gtlist
         
     # View the length of the spoken words
@@ -356,10 +373,9 @@ class AutoMannerPlus(object):
             else:
                 self.facedat[i] = np.zeros(24)
         # Add feature names
-        feat_name=[]
-        feat_name.extend(['mean_'+ahead for ahead in header[2:14]])
-        feat_name.extend(['std_'+ahead for ahead in header[2:14]])
-        self.featurenames.extend(feat_name)
+        self.face_feat_name=[]
+        self.face_feat_name.extend(['mean_'+ahead for ahead in header[2:14]])
+        self.face_feat_name.extend(['std_'+ahead for ahead in header[2:14]])
                 
     # Read the prosody files
     def __read_prosody__(self):
@@ -511,7 +527,7 @@ class AutoMannerPlus(object):
             'std_pos_'+head[3*j][:-2],
             'std_vel_'+head[3*j][:-2],
             'std_acc_'+head[3*j][:-2]])
-        self.featurenames.extend(feat_list)
+        self.body_feat_name = feat_list
 
     # Calculate the body movement features
     def __calcbodyfeat__(self,data):
