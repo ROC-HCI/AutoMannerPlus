@@ -41,12 +41,11 @@ class Classify(object):
         self.filename = pklfilename
         data = cp.load(open(pklfilename,'rb'))
         # Extract from data
-        X_unscaled = [[float(item) for item in dat] for vid in data['X'].keys()\
+        self.__X__ = [[float(item) for item in dat] for vid in data['X'].keys()\
             for dat in data['X'][vid]]
-        self.X = scale(X_unscaled)
         self.y = [item for vid in data['Y'].keys() for item in data['Y'][vid]]
         # Total number of features
-        self.totfeat = np.size(self.X,axis=1)
+        self.totfeat = np.size(self.__X__,axis=1)
         self.featnames = data['featurename']
         # Use all features
         self.usefeat()
@@ -61,7 +60,7 @@ class Classify(object):
         if self.totfeat==123:
             self.lex=lex
         # Standardize the features, x
-        self.x = np.nan_to_num(self.X/np.std(self.X,axis=0))
+        self.x = np.nan_to_num(self.__X__/np.std(self.__X__,axis=0))
         self.x = self.x - np.mean(self.x,axis=0)
         # Select the features according to the mask
         x_ = np.empty(0).reshape(len(self.x),0)
