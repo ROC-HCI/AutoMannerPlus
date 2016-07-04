@@ -697,3 +697,5 @@ class AutoMannerPlus_mturk(AutoMannerPlus):
             for akey in data_row.keys()}
         if raw_gt:
             return self.__gt_full__
+
+            

@@ -201,7 +201,7 @@ class Classify(object):
                 y_pred = model.predict(x_test)
                 y_score = model.decision_function(x_test)
                 # Calculate correlation with original
-                corr_val = sk.metrics.roc_auc_score(y_test,y_pred)
+                corr_val = sk.metrics.roc_auc_score(y_test,y_score)
                 fpr_temp,tpr_temp,_ = sk.metrics.roc_curve(y_test,y_score)
                 
                 tpr.append(np.interp(np.linspace(0,1,100),fpr_temp,tpr_temp))
