@@ -35,18 +35,34 @@ if __name__=='__main__':
     # =====================================
     # ------------ Regression -------------
     # Use the mechanical turk annotations
-    cls = Classify('all_features_MT_gt.pkl')
-    cls.test_avg_corr(show_plots=False,tot_iter=1000,method='lasso')
-    cls.test_avg_corr(show_plots=False,tot_iter=1000,method='lda')
-    cls.test_avg_corr(show_plots=False,tot_iter=1000,method='max-margin')
-    # Use the participants' self annotations
-    cls = Classify('all_features_gt.pkl')
-    cls.test_avg_corr(show_plots=False,tot_iter=1000,method='lasso')    
-    cls.test_avg_corr(show_plots=False,tot_iter=1000,method='lda')
-    cls.test_avg_corr(show_plots=True,tot_iter=1000,method='max-margin')
-    # ------------ Classification -------------
-    cls = Classify('all_features_MT_gt.pkl')
-    cls.test_avg_corr(show_plots=False,method='max-margin',task='classification',tot_iter=10)
-    # Use the participants' self annotations
-    cls = Classify('all_features_gt.pkl')
-    cls.test_avg_corr(show_plots=True,method='max-margin',task='classification',tot_iter=10)
+    # cls = Classify('all_features_MT_gt.pkl')
+    # cls.test_avg_corr(show_plots=False,tot_iter=1000,method='lasso')
+    # cls.test_avg_corr(show_plots=False,tot_iter=1000,method='lda')
+    # cls.test_avg_corr(show_plots=False,tot_iter=1000,method='max-margin')
+    # # Use the participants' self annotations
+    # cls = Classify('all_features_gt.pkl')
+    # cls.test_avg_corr(show_plots=False,tot_iter=1000,method='lasso')    
+    # cls.test_avg_corr(show_plots=False,tot_iter=1000,method='lda')
+    # cls.test_avg_corr(show_plots=True,tot_iter=1000,method='max-margin')
+    # # ------------ Classification -------------
+    # cls = Classify('all_features_MT_gt.pkl')
+    # cls.test_avg_corr(show_plots=False,method='max-margin',task='classification',tot_iter=10)
+    # # Use the participants' self annotations
+    # cls = Classify('all_features_gt.pkl')
+    # cls.test_avg_corr(show_plots=True,method='max-margin',task='classification',tot_iter=10)
+    # # ----------- Regression with MLP ---------
+    # cls = Classify_MLP('./all_features_MT_gt.pkl')
+    # cls.test_avg_corr()
+    # cls = Classify_MLP('./all_features_gt.pkl')
+    # cls.test_avg_corr()
+    # # ----------- Classification with MLP ---------
+    cls = Classify_MLP('./all_features_MT_gt.pkl')
+    cls.test_avg_corr(task='classification')
+    cls = Classify_MLP('./all_features_gt.pkl')
+    cls.test_avg_corr(task='classification')
+    # ----------- Classification with LASSO ---------
+    # cls = Classify_MLP('./all_features_MT_gt.pkl')
+    # cls.test_avg_corr(task='classification',method='LASSO')
+    # cls = Classify_MLP('./all_features_gt.pkl')
+    # cls.test_avg_corr(task='classification',method='LASSO')
+

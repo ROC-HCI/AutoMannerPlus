@@ -128,7 +128,6 @@ class AutoMannerPlus(object):
             accumulator.extend(self.lexfeatname)
         except AttributeError:
             pass
-
         return accumulator
         
     # Extract features from the aligned transcript data

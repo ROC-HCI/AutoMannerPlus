@@ -63,24 +63,48 @@ class Classify_MLP(Classify):
             # Compile the neural network
             self.model.compile(loss='mse',optimizer='rmsprop')
 
+        elif type == 'LASSO':
+            # Building a fully connected feedforward neural network
+            self.model = Sequential()
+            # First layer
+            self.model.add(Dense(output_dim=1,input_dim=n,W_regularizer=l1(0.02)))
+            self.model.add(Activation('sigmoid'))
+            # Print a summary of the neural network
+            self.model.summary()
+            # Compile the neural network
+            self.model.compile(loss='mse',optimizer='rmsprop')
+
+    def reset_weights(self):
+        weights = self.model.get_weights()
+
+        m = len(weights)
+        # replace the weights with gaussian noise
+        for idx in range(m):
+            mean_ = np.mean(weights[idx])
+            std_ = np.std(weights[idx])
+            weights[idx] = std_*np.random.randn(*np.shape(weights[idx])) + mean_
+        self.model.set_weights(weights)
 
     # Test avg. correlation for multiple regressions
     def test_avg_corr(self,
         show_all=False,
         show_plots=False,
         task='regression', # Task can be regression or classification
-        tot_iter = 30,  # Total number of repeated experiment
+        method='mlp',
+        tot_iter = 5,  # Total number of repeated experiment
         paramtuning=True,
         ):
 
         if task == 'classification':
-            self.__create_model__('mlp_classify')
+            if method == 'mlp':
+                self.__create_model__('mlp_classify')
+            elif method == 'LASSO':
+                self.__create_model__('LASSO')
             # Labels for classification
             Y_ = (np.array(self.y)>3.0).astype(float)
             # Half of the data is reserved as Evaluation set
             x_train,x_test,y_train,y_test = sk.cross_validation.train_test_split(\
                 self.x,Y_,test_size=0.5,random_state=int(time.time()*1000)%4294967295)
-            
 
             # Training the model with 100 epochs
             auc_list=[]
@@ -88,8 +112,8 @@ class Classify_MLP(Classify):
             tpr = []
             for i in range(tot_iter):
                 # Training the model with 100 epochs
-                self.model.reset_states()
-                self.model.fit(x_train,y_train,nb_epoch=50,batch_size=50)
+                self.reset_weights()
+                self.model.fit(x_train,y_train,nb_epoch=1500,batch_size=50)
                 # Get the output predictions and calculate correlation-coeff
                 y_score = self.model.predict_proba(x_test)[:,0]
                 # ROC Curve
@@ -99,6 +123,7 @@ class Classify_MLP(Classify):
 
             print auc_list
             print 'Average AUC',np.mean(auc_list)
+
             plt.figure()
             plt.plot(np.linspace(0,1,100),np.mean(tpr,axis=0),label='ROC Curve')
             #plt.plot(fpr_temp,tpr_temp,label='ROC Curve')
@@ -119,11 +144,11 @@ class Classify_MLP(Classify):
             corr_list = []
             for i in range(tot_iter):
                 # Training the model with 100 epochs
-                self.model.reset_states()
+                self.reset_weights()
                 self.model.fit(x_train,y_train,nb_epoch=100,batch_size=50)                
                 y_pred = self.model.predict_proba(x_test)[:,0].tolist()
                 corr_list.append(np.corrcoef(y_test,y_pred)[0,1])
             print corr_list
             print 'average correlation coefficient:',np.mean(corr_list)
 
-            
+        plt.show()
