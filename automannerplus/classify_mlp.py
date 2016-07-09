@@ -50,13 +50,13 @@ class Classify_MLP(Classify):
             # First layer
             self.model.add(Dense(output_dim=16,input_dim=n))
             self.model.add(Activation('relu'))
-            self.model.add(ActivityRegularization(l1=0.05))
+            self.model.add(ActivityRegularization(l1=0.02))
             # Second layer
             self.model.add(Dense(output_dim=16))
             self.model.add(Activation('relu'))
-            self.model.add(ActivityRegularization(l1=0.1))
+            self.model.add(ActivityRegularization(l1=0.02))
             # output
-            self.model.add(Dense(1))
+            self.model.add(Dense(1, W_regularizer = l1(0.01)))
             self.model.add(Activation('sigmoid'))
             # Print a summary of the neural network
             self.model.summary()
@@ -110,27 +110,69 @@ class Classify_MLP(Classify):
             auc_list=[]
             fpr = []
             tpr = []
+            coefs = []
             for i in range(tot_iter):
                 # Training the model with 100 epochs
                 self.reset_weights()
-                self.model.fit(x_train,y_train,nb_epoch=1500,batch_size=50)
+                self.model.fit(x_train,y_train,
+                    nb_epoch=1500 if method == 'LASSO' else 500,
+                    batch_size=50)
                 # Get the output predictions and calculate correlation-coeff
                 y_score = self.model.predict_proba(x_test)[:,0]
                 # ROC Curve
                 auc_list.append(sk.metrics.roc_auc_score(y_test,y_score))
                 fpr_temp,tpr_temp,_ = sk.metrics.roc_curve(y_test,y_score)
                 tpr.append(np.interp(np.linspace(0,1,100),fpr_temp,tpr_temp))
+                # Distribution of weights
+                coefs.append(self.__coef_calc__(self.model.get_weights()[0]))
+            meancorrel = np.mean(auc_list)
 
-            print auc_list
-            print 'Average AUC',np.mean(auc_list)
+            # Plot the coefficient distribution for LASSO classifier only
+            if method == 'LASSO':
+                print auc_list
+                # Print feature proportions
+                print '======================================'
+                print 'Task:',task,'Method:',method
+                print 'Average AUC:',meancorrel
+                print '======================================'
 
+                coef = np.mean(coefs,axis=0)
+                print 'disf:', coef[0]
+                print 'pros:', coef[1]
+                print 'body:', coef[2]
+                print 'face:', coef[3]
+                print 'lexical:', coef[4]
+                print 'Number of disf feats:', coef[5]
+                print 'Number of pros feats:', coef[6]
+                print 'Number of body feats:', coef[7]
+                print 'Number of face feats:', coef[8]
+                print 'Number of lexical feats:', coef[9]
+                print 'disf percent:',coef[-5]
+                print 'prosody percent:',coef[-4]
+                print 'Body Percent:', coef[-3]
+                print 'Face Percent:',coef[-2]
+                print 'Lexical Percent:',coef[-1]
+                print '--------------------------------'
+                # Visualize feature proportions
+                plt.figure(figsize=(7,3))
+                plt.pie(coef[-5:],autopct='%1.1f%%',
+                    labels = ['disfluency','prosody','body_movements','face','lexical'],
+                    colors = ['royalblue', 'darkkhaki', 'lightskyblue',\
+                     'lightcoral','yellowgreen'])
+                plt.axis('equal')
+                plt.subplots_adjust(top=0.75)
+                plt.title('Coefficient Ratio: '+task+'_'+method, y=1.10)
+                plt.savefig('Outputs/coef_ratio_'+self.filename[2:]+'_'+method+\
+                    '_'+task+'_'+'%0.2f' % meancorrel+'.pdf',format='pdf')
+            
+            # Draw ROC Curve
             plt.figure()
             plt.plot(np.linspace(0,1,100),np.mean(tpr,axis=0),label='ROC Curve')
             #plt.plot(fpr_temp,tpr_temp,label='ROC Curve')
             plt.xlabel('False Positive Rate')
             plt.ylabel('True Positive Rate')
-            plt.savefig('Outputs/ROC_Curve_MLP_'+self.filename[-12:]+'_'+\
-                '_'+task+'.pdf',format='pdf')
+            plt.savefig('Outputs/ROC_Curve_'+method+'_'+self.filename[2:]+'_'+\
+                '_'+task+'_'+'%0.2f' % meancorrel+'.pdf',format='pdf')
 
         elif task == 'regression':
             self.__create_model__('mlp')
@@ -150,5 +192,5 @@ class Classify_MLP(Classify):
                 corr_list.append(np.corrcoef(y_test,y_pred)[0,1])
             print corr_list
             print 'average correlation coefficient:',np.mean(corr_list)
-
-        plt.show()
+        if show_all:
+            plt.show()

@@ -1,0 +1,871 @@
+======================================
+Task: regression Method: lasso
+Average correlation: 0.628858951891
+======================================
+disf: 0.159999892903
+pros: 0.699706096838
+body: 0.553151251406
+face: 0.431057066012
+lexical: 0.17604123743
+Number of disf feats: 9.0
+Number of pros feats: 26.0
+Number of body feats: 41.0
+Number of face feats: 24.0
+Number of lexical feats: 23.0
+disf percent: 20.8333131407
+prosody percent: 32.3303547696
+Body Percent: 16.2452693592
+Face Percent: 21.4673431985
+Lexical Percent: 9.12371953201
+--------------------------------
+first formant std: 0.328749831643
+Minimum third formant: 0.242566572072
+mean_vel_KNEE_RIGHT: -0.216764501771
+Average time to speak filler word: -0.196233622482
+Mean loudness: 0.161865471462
+mean_LipCDt: 0.13213693245
+std_inBrL: 0.131006084916
+std_acc_ANKLE_RIGHT: 0.125817490247
+std_pos_ANKLE_LEFT: -0.109476523896
+count_Prepositions: 0.0928453573883
+mean_Roll : 0.0835605812719
+std_vel_WRIST_LEFT: -0.0703444755566
+Minimum loudness: 0.0595069113599
+Mean first formant: 0.0569370411934
+count_Adverbs: 0.0502911177018
+mean_acc_WRIST_RIGHT: 0.047931435802
+std_pos_WRIST_RIGHT: -0.0441957300761
+Average time to speak word: 0.0377333202142
+count_Swear: -0.0351926637494
+count_I: -0.0242959406064
+std_Yaw  : 0.017230437229
+std_pos_WRIST_LEFT: 0.00892435264379
+std_otBrL: 0.00644604329804
+count_Articles: 0.0
+count_Cognitive: 0.0
+std_vel_KNEE_LEFT: 0.0
+count_Inhibition: 0.0
+std_pos_KNEE_LEFT: 0.0
+count_Perceptual: 0.0
+mean_acc_KNEE_LEFT: 0.0
+mean_vel_KNEE_LEFT: -0.0
+std_acc_WRIST_RIGHT: 0.0
+std_vel_WRIST_RIGHT: -0.0
+count_Relativity: -0.0
+count_Work: 0.0
+mean_vel_WRIST_RIGHT: 0.0
+std_acc_ELBOW_RIGHT: -0.0
+std_vel_ELBOW_RIGHT: -0.0
+std_pos_ELBOW_RIGHT: 0.0
+mean_acc_ELBOW_RIGHT: -0.0
+mean_vel_ELBOW_RIGHT: 0.0
+std_acc_WRIST_LEFT: -0.0
+std_acc_KNEE_LEFT: 0.0
+count_Common Verbs: 0.0
+mean_vel_ANKLE_LEFT: 0.0
+count_Sadness: 0.0
+count_They: 0.0
+count_We: -0.0
+count_Conjunctions: -0.0
+count_Quantifiers: -0.0
+count_Total pronouns: -0.0
+count_Numbers: 0.0
+count_Positive emotion: 0.0
+std_vel_ANKLE_RIGHT: -0.0
+std_pos_ANKLE_RIGHT: -0.0
+mean_acc_ANKLE_RIGHT: 0.0
+count_Negative Emotion: 0.0
+std_acc_KNEE_RIGHT: 0.0
+std_vel_KNEE_RIGHT: 0.0
+std_pos_KNEE_RIGHT: -0.0
+count_Anxiety: 0.0
+mean_acc_KNEE_RIGHT: -0.0
+count_Anger: -0.0
+std_acc_ANKLE_LEFT: -0.0
+std_vel_ANKLE_LEFT: 0.0
+mean_acc_ANKLE_LEFT: -0.0
+mean_vel_ANKLE_RIGHT: -0.0
+std_pos_ELBOW_LEFT: 0.0
+mean_vel_WRIST_LEFT: -0.0
+third formant std: 0.0
+second formant std: 0.0
+Mean third formant: -0.0
+Mean second formant: 0.0
+Maximum third formant: 0.0
+Maximum second formant: 0.0
+Maximum first formant: 0.0
+Minimum second formant: 0.0
+Minimum first formant: -0.0
+pitch standard deviation: -0.0
+pitch range: -0.0
+first formant range: 0.0
+Maximum pitch: -0.0
+Mean pitch: -0.0
+loudness standard deviation: -0.0
+loudness range: -0.0
+Maximum loudness: -0.0
+% of pause per instance: 0.0
+% of filler per instance: -0.0
+% of word per instance: 0.0
+Total number of pauses: -0.0
+Total number of filler words: -0.0
+Total number of words: -0.0
+Average pause length: 0.0
+Minimum pitch: 0.0
+mean_acc_WRIST_LEFT: -0.0
+second formant range: 0.0
+percent unvoiced: 0.0
+std_acc_ELBOW_LEFT: -0.0
+std_vel_ELBOW_LEFT: -0.0
+count_Non-fluencies: 0.0
+mean_acc_ELBOW_LEFT: -0.0
+mean_vel_ELBOW_LEFT: 0.0
+std_LipCDt: 0.0
+std_iLipH: -0.0
+std_oLipH: 0.0
+std_EyeOR: -0.0
+std_EyeOL: 0.0
+std_otBrR: 0.0
+third formant range: 0.0
+std_inBrR: 0.0
+std_Pitch: -0.0
+mean_iLipH: 0.0
+mean_oLipH: -0.0
+mean_EyeOR: 0.0
+mean_EyeOL: 0.0
+mean_otBrR: 0.0
+mean_inBrR: 0.0
+mean_otBrL: 0.0
+mean_inBrL: 0.0
+mean_Yaw  : 0.0
+mean_Pitch: 0.0
+std_Roll : 0.0
+count_Fillers: -0.0
+
+/Users/itanveer/anaconda/lib/python2.7/site-packages/scipy/linalg/basic.py:884: RuntimeWarning: internal gelsd driver lwork query error, required iwork dimension not returned. This is likely the result of LAPACK bug 0038, fixed in LAPACK 3.2.2 (released July 21, 2010). Falling back to 'gelss' driver.
+  warnings.warn(mesg, RuntimeWarning)
+/Users/itanveer/anaconda/lib/python2.7/site-packages/sklearn/discriminant_analysis.py:453: UserWarning: The priors do not sum to 1. Renormalizing
+  UserWarning)
+/Users/itanveer/anaconda/lib/python2.7/site-packages/sklearn/covariance/shrunk_covariance_.py:193: UserWarning: Only one sample available. You may want to reshape your data array
+  warnings.warn("Only one sample available. "
+/Users/itanveer/anaconda/lib/python2.7/site-packages/sklearn/covariance/empirical_covariance_.py:75: UserWarning: Only one sample available. You may want to reshape your data array
+  warnings.warn("Only one sample available. "
+======================================
+Task: regression Method: lda
+Average correlation: 0.589748790174
+======================================
+disf: 2.80113662575
+pros: 7.39050859402
+body: 11.3206539973
+face: 6.79134796695
+lexical: 6.77979873136
+Number of disf feats: 9.0
+Number of pros feats: 26.0
+Number of body feats: 41.0
+Number of face feats: 24.0
+Number of lexical feats: 23.0
+disf percent: 21.4562201757
+prosody percent: 19.6278887194
+Body Percent: 18.9856959863
+Face Percent: 19.5438173408
+Lexical Percent: 20.3863777777
+--------------------------------
+std_Pitch: 2.26259467993
+Minimum third formant: -2.0740203199
+pitch standard deviation: -1.73816137729
+Average time to speak word: -1.61431510351
+% of pause per instance: -1.61134584113
+Average pause length: -1.59654254622
+Mean first formant: -1.54505147196
+third formant std: -1.53903642042
+mean_vel_KNEE_RIGHT: 1.49556677459
+std_acc_ANKLE_RIGHT: -1.4871911189
+% of word per instance: -1.44763866677
+Minimum loudness: -1.24722465349
+Mean second formant: -1.24548155803
+Total number of words: -1.24161527607
+Maximum third formant: -1.20896403295
+mean_vel_KNEE_LEFT: 1.17241749835
+Maximum second formant: -1.01222031148
+Average time to speak filler word: -1.00312670253
+mean_EyeOR: -0.952615779485
+std_EyeOL: -0.950313135691
+std_inBrR: 0.948006869913
+Total number of pauses: 0.944575743202
+std_pos_ANKLE_LEFT: 0.856033476321
+Mean third formant: 0.836600066392
+std_otBrL: -0.81397053988
+count_Articles: -0.800352739027
+count_Conjunctions: 0.783264167037
+std_otBrR: -0.771441267436
+mean_vel_WRIST_LEFT: 0.676557001795
+std_vel_ANKLE_LEFT: -0.663016722188
+second formant range: -0.659587293776
+std_Roll : -0.620193968822
+Mean loudness: -0.619869675716
+std_Yaw  : -0.607193583985
+Maximum loudness: -0.594505540325
+std_vel_KNEE_LEFT: -0.575413312341
+std_pos_KNEE_LEFT: 0.569407364587
+count_They: 0.562068338084
+count_Work: -0.551212632833
+mean_Roll : -0.550606164475
+count_Negative Emotion: 0.54541179779
+std_iLipH: -0.542247486961
+loudness range: 0.521457543799
+std_acc_KNEE_LEFT: -0.507681570909
+std_pos_KNEE_RIGHT: 0.489352688978
+mean_otBrR: 0.421528998736
+count_Anger: -0.413359818841
+mean_acc_ELBOW_LEFT: -0.410132096909
+mean_acc_WRIST_RIGHT: -0.402596846758
+std_pos_ANKLE_RIGHT: -0.396466381665
+loudness standard deviation: 0.393494773126
+std_acc_KNEE_RIGHT: 0.392263912565
+std_EyeOR: -0.385243521293
+count_Non-fluencies: -0.382910635391
+Maximum first formant: -0.376529754987
+Total number of filler words: 0.361605917112
+count_Swear: -0.351066052036
+count_Numbers: -0.347041693981
+std_pos_ELBOW_RIGHT: -0.339735667796
+std_acc_ANKLE_LEFT: 0.338201504289
+count_Prepositions: -0.335958358515
+count_Positive emotion: -0.327574725373
+count_Adverbs: -0.312411926154
+std_vel_ELBOW_LEFT: 0.308740157133
+mean_LipCDt: -0.305988094769
+std_vel_ELBOW_RIGHT: 0.303999573532
+mean_acc_WRIST_LEFT: 0.296104250754
+count_I: 0.290521853475
+Maximum pitch: -0.286976811451
+pitch range: -0.286976811451
+std_acc_ELBOW_RIGHT: -0.283856337219
+mean_vel_ELBOW_LEFT: 0.273160716129
+count_Relativity: -0.262013193301
+first formant range: -0.258647776413
+std_vel_KNEE_RIGHT: -0.253698640788
+% of filler per instance: 0.246175872193
+std_LipCDt: 0.241503492139
+mean_Pitch: -0.23888193023
+mean_acc_ANKLE_LEFT: 0.231482831848
+std_pos_WRIST_LEFT: 0.229518479524
+count_Quantifiers: 0.219024501449
+Mean pitch: 0.217910398606
+mean_oLipH: -0.203857695713
+count_Common Verbs: -0.187156688761
+mean_acc_KNEE_LEFT: 0.181348540307
+count_We: -0.171201095565
+mean_vel_ELBOW_RIGHT: 0.17044727855
+std_vel_WRIST_LEFT: 0.170322031018
+std_oLipH: -0.168825995961
+mean_inBrR: 0.166522034979
+std_pos_WRIST_RIGHT: -0.162030682807
+mean_vel_ANKLE_LEFT: 0.159350373952
+count_Total pronouns: 0.152317287225
+count_Fillers: 0.150309394007
+Minimum second formant: -0.148884357341
+std_pos_ELBOW_LEFT: -0.13974762528
+mean_acc_KNEE_RIGHT: -0.133785999922
+third formant range: 0.130366484526
+mean_vel_WRIST_RIGHT: -0.125844522289
+first formant std: 0.122739969934
+count_Anxiety: -0.113235378639
+count_Inhibition: 0.111115267728
+mean_acc_ANKLE_RIGHT: -0.0994789563684
+std_vel_ANKLE_RIGHT: 0.095276144006
+Minimum first formant: -0.0939210223884
+mean_inBrL: -0.093304359696
+mean_EyeOL: -0.0874719340908
+mean_acc_ELBOW_RIGHT: -0.0640087266717
+count_Sadness: -0.0593462005167
+count_Cognitive: -0.049460697567
+mean_vel_ANKLE_RIGHT: -0.0438004061038
+std_acc_WRIST_LEFT: -0.0354212033715
+std_acc_ELBOW_LEFT: -0.0298173620598
+count_Perceptual: 0.0244484747522
+second formant std: -0.0205275668353
+mean_otBrL: 0.0147363771594
+std_inBrL: 0.00785303279418
+std_acc_WRIST_RIGHT: 0.00588243216694
+mean_Yaw  : -0.0053119732167
+mean_iLipH: 0.00445997667873
+std_vel_WRIST_RIGHT: 0.000189471237796
+Minimum pitch: -3.19353211892e-15
+percent unvoiced: -1.07552396086e-16
+
+======================================
+Task: regression Method: max-margin
+Average correlation: 0.354603646252
+======================================
+disf: 0.351731376827
+pros: 0.926254707713
+body: 1.27876180583
+face: 0.944604677093
+lexical: 0.953666247918
+Number of disf feats: 9.0
+Number of pros feats: 26.0
+Number of body feats: 41.0
+Number of face feats: 24.0
+Number of lexical feats: 23.0
+disf percent: 20.6866998963
+prosody percent: 19.0970202836
+Body Percent: 16.8084909012
+Face Percent: 21.0820585504
+Lexical Percent: 22.3257303685
+--------------------------------
+count_Adverbs: 0.13117448311
+count_Numbers: 0.124659230802
+Minimum second formant: 0.116807000972
+mean_iLipH: 0.110134064144
+count_Cognitive: 0.102337618138
+count_Positive emotion: 0.102187189696
+% of pause per instance: 0.0965218536434
+std_Pitch: 0.0958673449863
+count_Anger: 0.0915615055723
+mean_LipCDt: 0.0910766350474
+Average pause length: 0.090505982357
+count_Sadness: 0.0881809130083
+Minimum third formant: 0.0838970816451
+Maximum second formant: 0.0837686660395
+mean_vel_KNEE_RIGHT: -0.0821455537822
+count_Inhibition: -0.0751687218848
+std_otBrL: 0.0747029382264
+std_acc_ANKLE_LEFT: -0.0728524807636
+Maximum pitch: -0.0714748381249
+pitch range: -0.0714748381249
+std_EyeOL: 0.069691460702
+count_Anxiety: 0.0686720717295
+std_inBrL: 0.0670052282838
+mean_vel_ANKLE_RIGHT: -0.0669499650877
+Mean second formant: 0.0651748902894
+second formant std: 0.0622897557726
+first formant std: 0.0620409686203
+Minimum first formant: -0.0619000661179
+mean_acc_ANKLE_RIGHT: -0.0612210031161
+std_Yaw  : 0.056555928481
+Total number of pauses: -0.0553513545401
+std_otBrR: 0.0553027921467
+count_Relativity: -0.0549087663247
+mean_acc_ANKLE_LEFT: 0.0545033509708
+mean_acc_WRIST_RIGHT: 0.054383803407
+std_pos_WRIST_LEFT: 0.0542032550215
+std_vel_ANKLE_LEFT: -0.0538496732519
+count_Perceptual: 0.0527693477323
+std_acc_WRIST_RIGHT: 0.0505878161571
+pitch standard deviation: -0.0489953574467
+Average time to speak filler word: -0.0478739953772
+std_Roll : 0.0461292134141
+% of filler per instance: -0.0460975734534
+Total number of filler words: -0.0421032934189
+third formant std: 0.0420915059968
+std_vel_KNEE_RIGHT: 0.0417029721817
+Total number of words: -0.0409153983641
+mean_Pitch: 0.0408865518126
+mean_vel_ELBOW_RIGHT: 0.0400795278255
+mean_acc_KNEE_LEFT: 0.0386617215809
+std_vel_WRIST_LEFT: -0.0379452302235
+loudness standard deviation: 0.0372128591447
+count_Conjunctions: 0.0359462585453
+count_Common Verbs: -0.0353692411693
+count_Negative Emotion: -0.0350219805686
+mean_vel_ANKLE_LEFT: 0.0329518617158
+Maximum third formant: 0.0329309589242
+mean_vel_WRIST_LEFT: -0.0325158356688
+std_inBrR: 0.0312781092298
+mean_acc_KNEE_RIGHT: 0.0296940370547
+count_Fillers: -0.029666362161
+first formant range: 0.0286129040815
+std_pos_ANKLE_LEFT: 0.0271276610645
+count_Swear: -0.0267997276789
+std_iLipH: -0.0254147420124
+Minimum loudness: -0.0253412347565
+Mean pitch: 0.0243752126375
+std_acc_ELBOW_LEFT: -0.0234773456955
+std_LipCDt: -0.0232263859279
+Mean third formant: -0.0229013519869
+count_They: 0.022883914853
+% of word per instance: 0.0225940312382
+mean_inBrL: 0.0216932626131
+count_Prepositions: 0.0209434974695
+mean_otBrL: -0.020867470582
+Average time to speak word: 0.0206126483295
+std_pos_ANKLE_RIGHT: 0.0203517092852
+std_acc_WRIST_LEFT: 0.019911742438
+mean_vel_ELBOW_LEFT: -0.0198952569866
+mean_inBrR: -0.0191542033558
+mean_Roll : 0.019147434781
+count_I: -0.0178237568424
+count_Total pronouns: 0.0177399288521
+std_acc_KNEE_RIGHT: -0.0174737416138
+std_pos_WRIST_RIGHT: 0.017217864991
+std_vel_ELBOW_LEFT: -0.0169398634178
+mean_EyeOR: 0.0166921348594
+mean_vel_KNEE_LEFT: -0.0164340899909
+mean_EyeOL: 0.016313993288
+mean_acc_ELBOW_LEFT: 0.0158745974443
+mean_otBrR: -0.0157844715693
+third formant range: -0.015721162892
+count_Quantifiers: -0.0154455650743
+Mean loudness: 0.015240196683
+Maximum first formant: 0.0148095284569
+mean_vel_WRIST_RIGHT: 0.0140628055888
+loudness range: 0.0136954299744
+count_We: 0.0131224707632
+std_pos_ELBOW_LEFT: 0.0130182945658
+std_vel_ANKLE_RIGHT: -0.0128807799335
+std_acc_ELBOW_RIGHT: -0.0127988824919
+mean_oLipH: 0.0118516007909
+std_acc_ANKLE_RIGHT: 0.0115483866146
+mean_Yaw  : -0.0112254110921
+count_Work: 0.0110211162218
+std_vel_KNEE_LEFT: 0.0107548234179
+Mean first formant: 0.00967589703768
+second formant range: 0.00913125848109
+mean_acc_WRIST_LEFT: 0.00862134992408
+count_Articles: -0.00842587519128
+std_oLipH: -0.00757560965176
+std_acc_KNEE_LEFT: 0.00675572425216
+std_pos_KNEE_RIGHT: 0.00641141923511
+Maximum loudness: -0.00637257494273
+std_vel_WRIST_RIGHT: -0.00614185078357
+std_pos_ELBOW_RIGHT: 0.00514771023992
+std_vel_ELBOW_RIGHT: -0.00490528937381
+count_Non-fluencies: 0.00398272201123
+std_pos_KNEE_LEFT: 0.00285568623234
+std_EyeOR: -0.00259318549732
+mean_acc_ELBOW_RIGHT: 0.00151756485733
+percent unvoiced: 0.0
+Minimum pitch: 0.0
+
+======================================
+Task: regression Method: lasso
+Average correlation: 0.368082561574
+======================================
+disf: 0.72179690194
+pros: 0.976166547265
+body: 0.967509425232
+face: 2.30099654794
+lexical: 2.42189240398
+Number of disf feats: 9.0
+Number of pros feats: 26.0
+Number of body feats: 41.0
+Number of face feats: 24.0
+Number of lexical feats: 23.0
+disf percent: 22.5665749484
+prosody percent: 11.0605194461
+Body Percent: 7.06562362203
+Face Percent: 28.2278314626
+Lexical Percent: 31.0794505209
+--------------------------------
+mean_vel_KNEE_RIGHT: -0.591716009819
+std_EyeOL: -0.555933243465
+mean_acc_ANKLE_RIGHT: 0.526138290134
+count_Common Verbs: -0.504077939335
+count_Conjunctions: 0.409677216095
+std_pos_ANKLE_LEFT: 0.397866922804
+std_pos_WRIST_RIGHT: -0.360093388377
+mean_vel_ANKLE_LEFT: -0.357796182442
+count_Numbers: -0.326954723199
+pitch range: 0.284266439426
+Average time to speak filler word: 0.268896930955
+count_We: 0.224887096285
+std_acc_KNEE_RIGHT: -0.216416336306
+count_Prepositions: -0.213931867514
+count_Fillers: 0.195932751942
+count_Swear: -0.173658289176
+std_vel_ELBOW_RIGHT: -0.167413345389
+mean_Yaw  : 0.167255131613
+Average pause length: 0.166170267046
+second formant std: 0.14796800206
+count_Adverbs: 0.131711164132
+Maximum pitch: 0.128167417983
+first formant std: 0.121252232548
+std_pos_KNEE_LEFT: 0.117513462376
+std_acc_ANKLE_LEFT: -0.105862495931
+count_Quantifiers: 0.0958946776777
+mean_vel_ELBOW_LEFT: 0.0877522878199
+Average time to speak word: 0.070576512751
+Mean first formant: -0.03396412231
+Minimum third formant: 0.0264489210822
+std_pos_ANKLE_RIGHT: 0.0113670744493
+count_Anxiety: -0.0101598730933
+std_inBrR: -0.00831991664922
+std_vel_ANKLE_RIGHT: 0.0
+Maximum loudness: 0.0
+mean_vel_ANKLE_RIGHT: 0.0
+loudness range: -0.0
+std_vel_KNEE_RIGHT: 0.0
+std_pos_KNEE_RIGHT: -0.0
+mean_acc_KNEE_RIGHT: -0.0
+loudness standard deviation: -0.0
+Mean second formant: 0.0
+std_acc_ANKLE_RIGHT: -0.0
+Minimum pitch: 0.0
+mean_acc_ANKLE_LEFT: -0.0
+pitch standard deviation: 0.0
+std_acc_KNEE_LEFT: 0.0
+std_vel_KNEE_LEFT: 0.0
+Minimum first formant: -0.0
+mean_acc_KNEE_LEFT: -0.0
+mean_vel_KNEE_LEFT: 0.0
+Mean pitch: -0.0
+std_vel_ANKLE_LEFT: -0.0
+count_Total pronouns: 0.0
+count_I: 0.0
+count_Work: -0.0
+count_Relativity: 0.0
+count_Perceptual: 0.0
+count_Inhibition: 0.0
+count_Cognitive: 0.0
+count_Sadness: 0.0
+count_Anger: 0.0
+count_Negative Emotion: -0.0
+count_Positive emotion: 0.0
+Total number of words: 0.0
+Total number of filler words: 0.0
+Total number of pauses: -0.0
+% of word per instance: 0.0
+% of filler per instance: 0.0
+% of pause per instance: 0.0
+Mean loudness: 0.0
+count_Articles: -0.0
+count_They: -0.0
+Minimum loudness: 0.0
+std_acc_WRIST_RIGHT: -0.0
+std_vel_WRIST_RIGHT: 0.0
+mean_acc_WRIST_RIGHT: -0.0
+Mean third formant: 0.0
+std_Yaw  : -0.0
+std_Pitch: -0.0
+mean_LipCDt: 0.0
+mean_iLipH: -0.0
+mean_oLipH: 0.0
+mean_EyeOR: -0.0
+mean_EyeOL: -0.0
+mean_otBrR: -0.0
+mean_inBrR: -0.0
+mean_otBrL: 0.0
+mean_inBrL: 0.0
+mean_Roll : -0.0
+Maximum third formant: 0.0
+mean_Pitch: 0.0
+percent unvoiced: 0.0
+third formant range: -0.0
+second formant range: 0.0
+first formant range: 0.0
+third formant std: -0.0
+std_Roll : -0.0
+std_inBrL: -0.0
+std_otBrL: -0.0
+std_otBrR: -0.0
+mean_vel_WRIST_RIGHT: -0.0
+std_acc_ELBOW_RIGHT: -0.0
+std_pos_ELBOW_RIGHT: -0.0
+mean_acc_ELBOW_RIGHT: -0.0
+mean_vel_ELBOW_RIGHT: 0.0
+std_acc_WRIST_LEFT: -0.0
+std_vel_WRIST_LEFT: -0.0
+std_pos_WRIST_LEFT: 0.0
+mean_acc_WRIST_LEFT: -0.0
+Minimum second formant: 0.0
+mean_vel_WRIST_LEFT: 0.0
+std_vel_ELBOW_LEFT: 0.0
+count_Non-fluencies: 0.0
+mean_acc_ELBOW_LEFT: -0.0
+Maximum first formant: 0.0
+std_LipCDt: 0.0
+std_iLipH: 0.0
+std_oLipH: -0.0
+std_EyeOR: 0.0
+Maximum second formant: 0.0
+std_acc_ELBOW_LEFT: -0.0
+std_pos_ELBOW_LEFT: -0.0
+
+======================================
+Task: regression Method: lda
+Average correlation: 0.314904631477
+======================================
+disf: 2.39095001711
+pros: 5.51020225132
+body: 8.05234965432
+face: 6.49441075748
+lexical: 7.39697177028
+Number of disf feats: 9.0
+Number of pros feats: 26.0
+Number of body feats: 41.0
+Number of face feats: 24.0
+Number of lexical feats: 23.0
+disf percent: 20.8898573909
+prosody percent: 16.7587349349
+Body Percent: 15.5319135549
+Face Percent: 21.3742576815
+Lexical Percent: 25.4452364377
+--------------------------------
+mean_vel_KNEE_RIGHT: 1.1842158866
+count_Common Verbs: 1.12431555604
+count_Numbers: 0.925969503218
+count_Inhibition: -0.877092825996
+std_pos_KNEE_LEFT: 0.771952729728
+std_acc_ANKLE_LEFT: 0.730927702766
+count_Prepositions: -0.730504464279
+count_Sadness: 0.613197014851
+mean_vel_ANKLE_LEFT: 0.611112197625
+Average time to speak word: -0.61093860207
+% of word per instance: -0.555200980849
+Average pause length: -0.521630501744
+Average time to speak filler word: -0.518091216835
+count_Quantifiers: 0.496684920063
+std_pos_ANKLE_LEFT: -0.446366973688
+count_Total pronouns: -0.442168686412
+% of pause per instance: -0.421698108217
+mean_vel_KNEE_LEFT: 0.420969947162
+count_Work: 0.403196960755
+std_otBrR: 0.379038391785
+Maximum loudness: -0.377830119279
+std_EyeOL: 0.376678942345
+mean_acc_KNEE_LEFT: 0.373502304093
+std_pos_KNEE_RIGHT: 0.367829065082
+loudness standard deviation: -0.348443080799
+loudness range: -0.345536509727
+% of filler per instance: -0.334495759459
+Mean third formant: 0.32851746317
+Mean loudness: -0.31990631037
+Maximum second formant: 0.313809966147
+count_Conjunctions: -0.312541308526
+pitch standard deviation: -0.307450223737
+std_vel_ANKLE_LEFT: 0.303548798813
+Mean first formant: 0.298555603938
+std_acc_KNEE_RIGHT: 0.290877850024
+count_Swear: 0.289330603109
+Maximum third formant: 0.286300621412
+count_Adverbs: -0.285152451208
+count_Anger: -0.273285222162
+std_iLipH: 0.262487756335
+Minimum third formant: 0.255896542266
+mean_acc_KNEE_RIGHT: 0.253157782748
+mean_vel_WRIST_RIGHT: -0.245605843215
+std_Roll : 0.235058407446
+mean_acc_WRIST_LEFT: 0.231540387164
+Minimum second formant: 0.230500094483
+count_Positive emotion: 0.221781562423
+std_oLipH: 0.220737085764
+mean_inBrR: 0.220305312562
+mean_vel_WRIST_LEFT: -0.215675409823
+count_Anxiety: 0.215138793886
+std_vel_WRIST_RIGHT: -0.214982760332
+Total number of filler words: -0.199906038601
+std_pos_WRIST_LEFT: 0.197301852125
+std_vel_KNEE_RIGHT: 0.195038972369
+mean_acc_ANKLE_LEFT: 0.176704284859
+mean_Roll : 0.170639352331
+count_Relativity: -0.166320011585
+third formant std: -0.160168816309
+mean_EyeOR: 0.157330293162
+std_LipCDt: -0.143203827092
+std_acc_WRIST_RIGHT: 0.14172707234
+std_pos_ELBOW_RIGHT: -0.141144083661
+std_Yaw  : 0.138380576648
+first formant std: -0.137617890797
+Mean second formant: 0.137235596978
+std_vel_WRIST_LEFT: 0.137185767713
+mean_acc_ELBOW_RIGHT: 0.13170445519
+mean_iLipH: 0.126835778625
+mean_acc_WRIST_RIGHT: -0.125976916247
+Mean pitch: -0.123712418459
+count_Perceptual: -0.117844316639
+count_They: 0.117097429445
+std_vel_ELBOW_RIGHT: -0.106801277862
+Minimum first formant: -0.105257581301
+mean_Yaw  : -0.102494630903
+std_vel_ELBOW_LEFT: -0.101287176999
+std_pos_WRIST_RIGHT: 0.0977024611194
+Minimum loudness: 0.097066042391
+mean_otBrR: -0.0893651114475
+std_Pitch: 0.0808760573415
+std_acc_WRIST_LEFT: 0.0790932453536
+std_acc_ANKLE_RIGHT: -0.0770697549986
+Maximum pitch: -0.0745034272826
+pitch range: -0.0745034272826
+std_inBrL: 0.0736289281284
+Total number of pauses: 0.0714758258767
+Total number of words: 0.0703164945682
+mean_vel_ELBOW_LEFT: -0.0665450526945
+std_inBrR: -0.0630547544325
+mean_acc_ELBOW_LEFT: 0.0630422882771
+second formant range: 0.0609289584388
+third formant range: 0.0597978137217
+count_Cognitive: -0.0589585780234
+second formant std: 0.0564248207125
+mean_Pitch: -0.053222268791
+first formant range: 0.0511571865389
+std_pos_ANKLE_RIGHT: -0.0492932910848
+mean_otBrL: -0.0469569613933
+std_vel_ANKLE_RIGHT: 0.0466297418118
+std_EyeOR: 0.0448460616588
+count_I: 0.0417961046743
+mean_EyeOL: -0.0409438797202
+std_vel_KNEE_LEFT: -0.039046181901
+std_acc_ELBOW_LEFT: -0.0371592755129
+std_acc_ELBOW_RIGHT: 0.0366070002006
+mean_LipCDt: -0.0353676239503
+mean_vel_ELBOW_RIGHT: 0.0326806498634
+count_Negative Emotion: 0.0308221812823
+std_otBrL: -0.0299863375701
+Maximum first formant: 0.0277025327762
+count_Non-fluencies: 0.025487809186
+std_acc_KNEE_LEFT: 0.0202123155869
+mean_vel_ANKLE_RIGHT: 0.0194104138631
+mean_oLipH: -0.0159753384391
+std_pos_ELBOW_LEFT: -0.0145360206133
+count_We: -0.0141135665023
+count_Fillers: 0.0127901972418
+mean_inBrL: -0.00508471949605
+count_Articles: 0.00307588147814
+mean_acc_ANKLE_RIGHT: -0.00247980602061
+percent unvoiced: 6.25587905449e-16
+Minimum pitch: -2.87884631646e-16
+
+======================================
+Task: regression Method: max-margin
+Average correlation: 0.0490931964968
+======================================
+disf: 0.289989822608
+pros: 0.727619913808
+body: 1.02631248097
+face: 0.783043518895
+lexical: 0.702488818907
+Number of disf feats: 9.0
+Number of pros feats: 26.0
+Number of body feats: 41.0
+Number of face feats: 24.0
+Number of lexical feats: 23.0
+disf percent: 21.444775582
+prosody percent: 18.8172237222
+Body Percent: 16.8482808378
+Face Percent: 22.0346698227
+Lexical Percent: 20.8550500352
+--------------------------------
+count_Adverbs: -0.0878216343629
+count_Inhibition: 0.0855685821853
+count_Common Verbs: -0.0812324119832
+Minimum third formant: -0.0756268822711
+mean_Roll : 0.0731243293056
+Total number of pauses: -0.0706953857726
+mean_Pitch: 0.0701458736117
+count_Cognitive: -0.0681342310696
+count_Fillers: -0.0672958671353
+count_Total pronouns: -0.0666148401268
+mean_vel_KNEE_RIGHT: 0.0625612704547
+std_Pitch: 0.0625206605188
+count_Conjunctions: 0.0623709056909
+std_acc_ANKLE_RIGHT: 0.0614924822332
+std_acc_WRIST_RIGHT: 0.0606592061417
+mean_iLipH: 0.0552838578587
+mean_acc_KNEE_LEFT: 0.0529338033587
+Total number of words: -0.0525593608388
+mean_oLipH: -0.0491258444901
+loudness range: 0.0474204427077
+count_Articles: 0.0470624631816
+std_vel_ANKLE_LEFT: 0.0451933504359
+std_Yaw  : 0.0449088377382
+std_acc_KNEE_LEFT: 0.0448778021571
+std_vel_KNEE_LEFT: 0.0434937841507
+count_Prepositions: -0.0430542990405
+std_EyeOL: -0.042556236003
+third formant range: 0.0412851919585
+mean_inBrR: 0.03902414767
+mean_inBrL: 0.0382698099244
+Mean first formant: 0.0381214268967
+std_pos_WRIST_RIGHT: -0.0374043151799
+std_oLipH: -0.0367883638392
+mean_vel_ELBOW_LEFT: -0.035855539567
+std_vel_ELBOW_RIGHT: 0.0349565799054
+std_acc_ANKLE_LEFT: 0.0343505085679
+count_Swear: -0.0342278439738
+std_otBrR: -0.0323297151566
+Maximum loudness: 0.0322098385198
+pitch standard deviation: -0.0321647883209
+count_Positive emotion: -0.0319736473714
+std_pos_ANKLE_LEFT: 0.0314431306913
+std_vel_WRIST_RIGHT: 0.0306681025485
+count_Negative Emotion: 0.0297043519278
+Average time to speak word: 0.0293103383726
+Mean loudness: 0.0291012811805
+Average pause length: 0.0288118810862
+mean_Yaw  : 0.0275288920776
+mean_EyeOR: -0.0259468855102
+mean_acc_WRIST_RIGHT: 0.0258981412488
+mean_vel_KNEE_LEFT: 0.0257912222114
+Minimum loudness: -0.025775883731
+std_inBrR: 0.0257590559494
+third formant std: 0.0244384699177
+Mean third formant: -0.0241274604379
+count_Quantifiers: -0.0238442155511
+std_Roll : 0.0235410204269
+count_Numbers: -0.0233242934886
+std_otBrL: -0.0232741788432
+mean_acc_ANKLE_LEFT: 0.0232185399975
+count_They: 0.0230739041132
+mean_otBrL: 0.0225313763701
+std_acc_ELBOW_RIGHT: 0.0209777149648
+std_pos_KNEE_LEFT: 0.0201753909078
+std_iLipH: -0.0195738095236
+Average time to speak filler word: 0.0187635770041
+count_Sadness: 0.0183623942804
+count_Anger: -0.0183065997416
+std_inBrL: 0.0181884692469
+mean_acc_ELBOW_RIGHT: 0.0179351308266
+count_Work: -0.0175662702115
+% of word per instance: 0.0175560120711
+second formant std: -0.0169233502892
+std_acc_WRIST_LEFT: 0.0163675153999
+count_I: -0.0158389460054
+std_pos_ELBOW_RIGHT: 0.0149638600612
+std_LipCDt: -0.0146943876904
+count_Perceptual: 0.0132951170681
+mean_acc_WRIST_LEFT: 0.0125701900994
+mean_LipCDt: 0.0125030449332
+std_pos_WRIST_LEFT: -0.012248945793
+count_Non-fluencies: -0.0120794642942
+std_pos_ELBOW_LEFT: -0.0119426408789
+Total number of filler words: 0.011780212044
+Minimum second formant: -0.0112800306516
+Maximum second formant: -0.0109201847688
+Mean second formant: -0.010801937895
+mean_vel_WRIST_RIGHT: 0.0105772154539
+first formant std: 0.00986906754581
+% of pause per instance: -0.00985204473887
+mean_vel_ANKLE_LEFT: -0.00965920392084
+count_We: -0.00940143005043
+mean_acc_KNEE_RIGHT: 0.00916566552205
+% of filler per instance: 0.00903273177045
+std_pos_KNEE_RIGHT: -0.00880165713235
+std_vel_KNEE_RIGHT: 0.00809385317542
+std_vel_ELBOW_LEFT: -0.00730007639646
+Maximum first formant: 0.00725600424885
+std_acc_ELBOW_LEFT: 0.00696294731069
+std_EyeOR: -0.0065419460268
+mean_acc_ANKLE_RIGHT: -0.0064190410329
+first formant range: 0.00633900356881
+mean_vel_ANKLE_RIGHT: -0.00594986879448
+mean_acc_ELBOW_LEFT: 0.00569086749548
+Maximum pitch: 0.00564717458316
+pitch range: 0.00564717458316
+mean_vel_WRIST_LEFT: -0.00532286571051
+Maximum third formant: 0.00495862220836
+count_Anxiety: 0.00464056531706
+Mean pitch: -0.00458251383074
+loudness standard deviation: 0.00384790554889
+std_vel_ANKLE_RIGHT: -0.00314703215487
+std_vel_WRIST_LEFT: 0.00294321216215
+std_acc_KNEE_RIGHT: -0.00282274509841
+std_pos_ANKLE_RIGHT: 0.00277001231449
+Minimum first formant: -0.00243302549679
+second formant range: -0.00235668988059
+mean_vel_ELBOW_RIGHT: -0.00232739087419
+mean_otBrR: 0.000592408098313
+mean_EyeOL: -0.000295840167858
+count_Relativity: -5.45068556795e-05
+Minimum pitch: 0.0
+percent unvoiced: 0.0
