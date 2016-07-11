@@ -1,8 +1,17 @@
+"""
+-------------------------------------------------------------------------------
+    Coded by Md. Iftekhar Tanveer (itanveer@cs.rochester.edu)
+    Rochester Human-Computer Interaction (ROCHCI)
+    University of Rochester
+-------------------------------------------------------------------------------
+"""
+
 from classify import Classify
 
 import numpy as np
 import time
 import sklearn as sk
+import random as rn
 
 # Keras
 from keras.models import Sequential
@@ -93,8 +102,16 @@ class Classify_MLP(Classify):
         method='mlp',
         tot_iter = 5,  # Total number of repeated experiment
         paramtuning=True,
+        equalize_MT_sample_size=False
         ):
-
+        # For mechanical turk annotations, resample to make the
+        # size of the dataset comparable to the participants annotations
+        if equalize_MT_sample_size:
+            if len(self.x)>150:
+                ids = rn.sample(range(len(self.x)),len(self.x)/3)
+                self.x = self.x[ids,:]
+                self.y = np.array(self.y)[ids]
+        # For classification
         if task == 'classification':
             if method == 'mlp':
                 self.__create_model__('mlp_classify')
@@ -131,6 +148,7 @@ class Classify_MLP(Classify):
             if method == 'LASSO':
                 print auc_list
                 # Print feature proportions
+                print self.filename
                 print '======================================'
                 print 'Task:',task,'Method:',method
                 print 'Average AUC:',meancorrel

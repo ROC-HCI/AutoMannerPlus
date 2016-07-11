@@ -10,6 +10,7 @@ Created on Tue Jun 28 3:19:10 2016
 # Python lib
 import numpy as np
 from scipy.stats import expon
+import random as rn
 import cPickle as cp
 import time
 
@@ -84,7 +85,16 @@ class Classify(object):
         task='regression', # Task can be regression or classification
         tot_iter = 30,  # Total number of repeated experiment
         paramtuning=True,
+        equalize_MT_sample_size=False
         ):
+        # For mechanical turk annotations, resample to make the
+        # size of the dataset comparable to the participants annotations
+        if equalize_MT_sample_size:
+            if len(self.x)>150:
+                ids = rn.sample(range(len(self.x)),len(self.x)/3)
+                self.x = self.x[ids,:]
+                self.y = np.array(self.y)[ids]
+        # For regression
         if task=='regression':
             # Train and test the classifier many times for calculating the accuracy
             correl = []
@@ -92,7 +102,7 @@ class Classify(object):
             for i in xrange(tot_iter):
                 if show_all:
                     print 'iter:',i,
-                # One third of the data is reserved for testing
+                # One third of the data is reserved for testing                
                 x_train,x_test,y_train,y_test = \
                     sk.cross_validation.train_test_split(\
                     self.x,self.y,test_size=0.3,random_state=\
@@ -217,6 +227,7 @@ class Classify(object):
 
         # Print feature proportions
         meancorrel = np.mean(correl)
+        print self.filename
         print '======================================'
         print 'Task:',task,'Method:',method
         if task=='regression':
