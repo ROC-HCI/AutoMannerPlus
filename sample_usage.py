@@ -29,7 +29,7 @@ if __name__=='__main__':
     # utils.save_all_features(alignpath,timepath,timepath_turk,gtfile,gtfile_turk,prosodypath,transpath)
     
     # ------------- Misc Stats ------------
-    utils.calc_misc_stat(alignpath,timepath,timepath_turk,gtfile,gtfile_turk,prosodypath,transpath)
+    # utils.calc_misc_stat(alignpath,timepath,timepath_turk,gtfile,gtfile_turk,prosodypath,transpath)
 
 
     ######################################################################
@@ -41,33 +41,35 @@ if __name__=='__main__':
     # # ------------ Regression -------------
     # Use the mechanical turk annotations
     cls = Classify('all_features_MT_gt.pkl')
-    cls.test_avg_corr(show_plots=True,tot_iter=1000,method='lasso')
-    cls.test_avg_corr(show_plots=True,tot_iter=1000,method='lda')
-    cls.test_avg_corr(show_plots=True,tot_iter=1000,method='max-margin')
+    # cls.test_avg_corr(show_plots=True,tot_iter=1000,method='lasso')
+    # cls.test_avg_corr(show_plots=True,tot_iter=1000,method='lda')
+    cls.test_avg_corr(show_plots=True,tot_iter=1000,task = 'classification',method='lda',equalize_MT_sample_size=True) 
+    # cls.test_avg_corr(show_plots=True,tot_iter=1000,method='max-margin')
     # # Use the participants' self annotations
     cls = Classify('all_features_gt.pkl')
-    cls.test_avg_corr(show_plots=True,tot_iter=1000,method='lasso')    
-    cls.test_avg_corr(show_plots=True,tot_iter=1000,method='lda')
-    cls.test_avg_corr(show_plots=True,tot_iter=1000,method='max-margin')
+    # cls.test_avg_corr(show_plots=True,tot_iter=1000,method='lasso')    
+    # cls.test_avg_corr(show_plots=True,tot_iter=1000,method='lda')
+    cls.test_avg_corr(show_plots=True,tot_iter=1000,task = 'classification',method='lda',equalize_MT_sample_size=True)
+    # cls.test_avg_corr(show_plots=True,tot_iter=1000,method='max-margin')
     # ----------- Regression with MLP ---------
-    cls = Classify_MLP('./all_features_MT_gt.pkl')
-    cls.test_avg_corr()
-    cls = Classify_MLP('./all_features_gt.pkl')
-    cls.test_avg_corr()
-    # ------------ Classification -------------
-    cls = Classify('all_features_MT_gt.pkl')
-    cls.test_avg_corr(show_plots=False,method='max-margin',task='classification',tot_iter=10)
-    # Use the participants' self annotations
-    cls = Classify('all_features_gt.pkl')
-    cls.test_avg_corr(show_plots=True,method='max-margin',task='classification',tot_iter=10)    
-    # ----------- Classification with MLP ---------
-    cls = Classify_MLP('./all_features_MT_gt.pkl')
-    cls.test_avg_corr(task='classification')
-    cls = Classify_MLP('./all_features_gt.pkl')
-    cls.test_avg_corr(task='classification')
-    # ----------- Classification with LASSO ---------
-    cls = Classify_MLP('./all_features_MT_gt.pkl')
-    cls.test_avg_corr(show_all=True,task='classification',method='LASSO')
-    cls = Classify_MLP('./all_features_gt.pkl')
-    cls.test_avg_corr(show_all=True,task='classification',method='LASSO')
+    # cls = Classify_MLP('./all_features_MT_gt.pkl')
+    # cls.test_avg_corr()
+    # cls = Classify_MLP('./all_features_gt.pkl')
+    # cls.test_avg_corr()
+    # # ------------ Classification -------------
+    # cls = Classify('all_features_MT_gt.pkl')
+    # cls.test_avg_corr(show_plots=False,method='max-margin',task='classification',tot_iter=10)
+    # # Use the participants' self annotations
+    # cls = Classify('all_features_gt.pkl')
+    # cls.test_avg_corr(show_plots=True,method='max-margin',task='classification',tot_iter=10)    
+    # # ----------- Classification with MLP ---------
+    # cls = Classify_MLP('./all_features_MT_gt.pkl')
+    # cls.test_avg_corr(task='classification')
+    # cls = Classify_MLP('./all_features_gt.pkl')
+    # cls.test_avg_corr(task='classification')
+    # # ----------- Classification with LASSO ---------
+    # cls = Classify_MLP('./all_features_MT_gt.pkl')
+    # cls.test_avg_corr(show_all=True,task='classification',method='LASSO')
+    # cls = Classify_MLP('./all_features_gt.pkl')
+    # cls.test_avg_corr(show_all=True,task='classification',method='LASSO')
 

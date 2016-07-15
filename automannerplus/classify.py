@@ -158,23 +158,22 @@ class Classify(object):
 
             # Iterate for averaging the accuracy
             for i in xrange(tot_iter):
-                if paramtuning:
-                    # Half of the data is reserved as Evaluation set
-                    x_train,x_test,y_train,y_test = \
-                        sk.cross_validation.train_test_split(\
-                        self.x,Y_,test_size=0.5,random_state=\
-                        int(time.time()*1000)%4294967295)  
-                    param_grid = {'C':expon(loc=0.,scale=3)}
-                    clf = RandomizedSearchCV(sk.svm.LinearSVC(penalty='l1',\
-                        dual=False,fit_intercept=True),param_grid,cv=5,\
-                        scoring='roc_auc',n_iter=50)
-                    clf.fit(x_train,y_train)
-                    print 'best param (C)',clf.best_params_['C']
-
-                    if show_all:
-                        print 'iter:',i,
-                    # Only max-margin for classification
-                    if method=='max-margin':
+                # Half of the data is reserved as Evaluation set
+                x_train,x_test,y_train,y_test = \
+                    sk.cross_validation.train_test_split(\
+                    self.x,Y_,test_size=0.5,random_state=\
+                    int(time.time()*1000)%4294967295)
+                if method=='max-margin':
+                    # If tune the max margin parameters
+                    if paramtuning:
+                        param_grid = {'C':expon(loc=0.,scale=3)}
+                        clf = RandomizedSearchCV(sk.svm.LinearSVC(penalty='l1',\
+                            dual=False,fit_intercept=True),param_grid,cv=5,\
+                            scoring='roc_auc',n_iter=50)
+                        clf.fit(x_train,y_train)
+                        print 'best param (C)',clf.best_params_['C']
+                        if show_all:
+                            print 'iter:',i,
                         model = sk.svm.LinearSVC(C = clf.best_params_['C'],
                             penalty='l1',dual=False,fit_intercept=True,
                             random_state=int(time.time()*1000)%4294967295)
@@ -184,17 +183,13 @@ class Classify(object):
                                 modelcoef = model.coef_[0]
                             coefs.append(self.__coef_calc__(modelcoef))
                     else:
-                        raise ValueError("Method "+method+" not supported yet")
-                else:
-                    # Train test split
-                    x_train,x_test,y_train,y_test = \
-                        sk.cross_validation.train_test_split(\
-                        self.x,Y_,test_size=0.4,random_state=\
-                        int(time.time()*1000)%4294967295)  
-                    if show_all:
-                        print 'iter:',i,
-                    # Only max-margin for classification
-                    if method=='max-margin':
+                        # Train test split
+                        x_train,x_test,y_train,y_test = \
+                            sk.cross_validation.train_test_split(\
+                            self.x,Y_,test_size=0.5,random_state=\
+                            int(time.time()*1000)%4294967295)  
+                        if show_all:
+                            print 'iter:',i,
                         model = sk.svm.LinearSVC(C = 0.05,
                             penalty='l1',dual=False,fit_intercept=True,
                             random_state=int(time.time()*1000)%4294967295)
@@ -204,9 +199,18 @@ class Classify(object):
                             if model.coef_.ndim>1:
                                 modelcoef = model.coef_[0]
                             coefs.append(self.__coef_calc__(modelcoef))
-                    else:
-                        raise ValueError("Method "+method+" not supported yet")
-
+                elif method=='lda':
+                    model = sk.discriminant_analysis.\
+                        LinearDiscriminantAnalysis(
+                        solver='lsqr',
+                        shrinkage='auto')
+                    # Training the model
+                    model.fit(x_train,y_train)
+                    if self.disf and self.pros and self.body and self.face \
+                        and self.lex:
+                        modelcoef = model.coef_
+                        coefs.append(self.__coef_calc__(np.mean(\
+                            np.abs(modelcoef),axis=0)))
                 # Prediction results
                 y_pred = model.predict(x_test)
                 y_score = model.decision_function(x_test)
