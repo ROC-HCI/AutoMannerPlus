@@ -10,6 +10,7 @@ Created on Tue Jun 28 3:19:10 2016
 # Python lib
 import numpy as np
 from scipy.stats import expon
+
 import random as rn
 import cPickle as cp
 import time
@@ -84,8 +85,9 @@ class Classify(object):
         method='lasso', # Method of classification
         task='regression', # Task can be regression or classification
         tot_iter = 30,  # Total number of repeated experiment
-        paramtuning=True,
-        equalize_MT_sample_size=False
+        paramtuning=False,
+        equalize_MT_sample_size=False,
+        returnres=False  # Whether returns the results early
         ):
         # For mechanical turk annotations, resample to make the
         # size of the dataset comparable to the participants annotations
@@ -140,6 +142,8 @@ class Classify(object):
                     if self.disf and self.pros and self.body and self.face and self.lex:
                         modelcoef = model.coef_
                         coefs.append(self.__coef_calc__(modelcoef))
+                else:
+                    raise ValueError('method can take only "lasso", "lda", or "max-margin"')
                 # Prediction results
                 y_pred = model.predict(x_test)
                 # Calculate correlation with original
@@ -147,6 +151,8 @@ class Classify(object):
                 correl.append(corr_val)
                 if show_all:
                     print 'Correlation:',corr_val
+            if returnres:
+                return correl
         elif task=='classification':
             # Train and test the classifier many times for calculating the accuracy
             correl = []
@@ -211,6 +217,9 @@ class Classify(object):
                         modelcoef = model.coef_
                         coefs.append(self.__coef_calc__(np.mean(\
                             np.abs(modelcoef),axis=0)))
+                else:
+                    raise ValueError(\
+            'method can take only lda, or max-margin when task is classification')
                 # Prediction results
                 y_pred = model.predict(x_test)
                 y_score = model.decision_function(x_test)
@@ -222,13 +231,17 @@ class Classify(object):
                 correl.append(corr_val)
                 if show_all:
                     print 'Accuracy:',corr_val
+            # Process/Visualize the results
+            if returnres:
+                return correl
             plt.figure()
             plt.plot(np.linspace(0,1,100),np.mean(tpr,axis=0),label='ROC Curve')
             plt.xlabel('False Positive Rate')
             plt.ylabel('True Positive Rate')
             plt.savefig('Outputs/ROC_Curve_'+self.filename+'_'+\
                 method+'_'+task+'.pdf',format='pdf')
-
+        else:
+            raise ValueError('Only "classification" or "regression" allowed as task value')
         # Print feature proportions
         meancorrel = np.mean(correl)
         print self.filename

@@ -14,8 +14,29 @@ from collections import defaultdict as ddict
 # Python lib
 import numpy as np
 import cPickle as cp
+from scipy.stats import ttest_ind
 # Plot related
 import matplotlib.pyplot as plt
+
+# Performs a t-test to see if there is any difference between
+# two groups of accuracies or correlation coefficients
+# N is the number of samples
+# cls1 and cls2 are initialized Classify objects
+def perform_t_test(cls1,method1,task1,subsampl1,cls2,method2,\
+    task2,subsampl2,N,showgroups=False):
+    group1 = cls1.test_avg_corr(method=method1,task=task1,tot_iter=N,\
+        equalize_MT_sample_size=subsampl1,returnres=True)
+    group2 = cls2.test_avg_corr(method=method2,task=task2,tot_iter=N,\
+        equalize_MT_sample_size=subsampl2,returnres=True)
+    if showgroups:
+        print 'group1'
+        print group1
+        print 'group2'
+        print group2
+    import warnings
+    warnings.filterwarnings(action="ignore")
+    # returning the p-value
+    return ttest_ind(group1,group2)[1]
 
 # Calculates the misc statistics
 def calc_misc_stat(

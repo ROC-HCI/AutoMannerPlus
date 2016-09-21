@@ -102,7 +102,8 @@ class Classify_MLP(Classify):
         method='mlp',
         tot_iter = 5,  # Total number of repeated experiment
         paramtuning=True,
-        equalize_MT_sample_size=False
+        equalize_MT_sample_size=False,
+        returnres=False  # Whether returns the results early
         ):
         # For mechanical turk annotations, resample to make the
         # size of the dataset comparable to the participants annotations
@@ -142,6 +143,8 @@ class Classify_MLP(Classify):
                 tpr.append(np.interp(np.linspace(0,1,100),fpr_temp,tpr_temp))
                 # Distribution of weights
                 coefs.append(self.__coef_calc__(self.model.get_weights()[0]))
+            if returnres:
+                return auc_list
             meancorrel = np.mean(auc_list)
 
             # Plot the coefficient distribution for LASSO classifier only
@@ -208,7 +211,12 @@ class Classify_MLP(Classify):
                 self.model.fit(x_train,y_train,nb_epoch=100,batch_size=50)                
                 y_pred = self.model.predict_proba(x_test)[:,0].tolist()
                 corr_list.append(np.corrcoef(y_test,y_pred)[0,1])
-            print corr_list
+            if returnres:
+                return corr_list
+            if show_all:
+                print corr_list
             print 'average correlation coefficient:',np.mean(corr_list)
+        else:
+            raise ValueError('Only "classification" or "regression" allowed as task value')
         if show_all:
             plt.show()
