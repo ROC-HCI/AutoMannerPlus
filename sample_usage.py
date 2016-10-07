@@ -80,8 +80,8 @@ if __name__=='__main__':
     cls2.test_avg_corr(show_plots=True,method='max-margin',task='classification',tot_iter=10)    
     cls2.test_avg_corr(show_plots=True,tot_iter=1000,task = 'classification',method='lda')
 
-    Perform t-test to see if there is any significant difference between
-    two groups of accuracies or correlation coefficients
+    # Perform t-test to see if there is any significant difference between
+    # two groups of accuracies or correlation coefficients
     print 'p value (lda-MTS classification vs lda-self classification):',\
         utils.perform_t_test(cls1,'lda','classification',True,\
             cls2,'lda','classification',False,100)
